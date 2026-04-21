@@ -28,6 +28,10 @@ class HiringSignalBrief(BaseModel):
     # Evidence chain
     evidence: list[SignalEvidence] = Field(default_factory=list)
 
+    # ICP classification result (populated by enrichment pipeline)
+    icp_segment: Optional[str] = None
+    icp_confidence: float = 0.0
+
     # Agent-facing summary
     brief_summary: str = ""
     pitch_angle: str = ""

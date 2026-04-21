@@ -4,7 +4,6 @@ Runs the full loop: enrich → classify → compose → send → track → quali
 Every step is logged to Langfuse for observability.
 """
 from __future__ import annotations
-import asyncio
 import json
 import os
 import uuid
@@ -12,21 +11,18 @@ from datetime import datetime
 from typing import Optional
 
 from langfuse import Langfuse
-from langfuse.decorators import observe, langfuse_context
 
 from .enrichment.pipeline import enrich_prospect
 from .email.composer import compose_cold_email, tone_check
 from .email.sender import send_email
 from .email.reply_handler import classify_reply
-from .sms.sender import send_sms, compose_scheduling_sms
-from .sms.handler import classify_sms_reply
 from .crm.hubspot import (
     create_or_update_contact, update_contact_enrichment,
     create_deal, log_email_sent, log_email_reply,
-    log_sms_sent, log_call_booked
+    log_call_booked
 )
 from .calendar.calcom import get_available_slots, create_booking, build_booking_brief
-from .models.prospect import Prospect, ICPSegment, ConversationStatus
+from .models.prospect import ICPSegment
 
 
 LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY", "")
@@ -47,17 +43,20 @@ def _get_langfuse() -> Optional[Langfuse]:
     return _langfuse
 
 
-def _trace(name: str, input_data: dict, output_data: dict, metadata: dict = None):
-    """Write a trace to Langfuse."""
+def _trace(name: str, input_data: dict, output_data: dict, metadata: Optional[dict] = None):
+    """Write a trace to Langfuse (v4-compatible with graceful fallback)."""
     lf = _get_langfuse()
     if lf:
-        trace = lf.trace(
-            name=name,
-            input=input_data,
-            output=output_data,
-            metadata=metadata or {},
-        )
-        return trace.id
+        try:
+            trace = lf.trace(
+                name=name,
+                input=input_data,
+                output=output_data,
+                metadata=metadata or {},
+            )
+            return trace.id
+        except Exception:
+            pass
     return str(uuid.uuid4())
 
 
@@ -111,13 +110,10 @@ async def run_prospect_pipeline(
         gap_brief_dict = {"target_company": company_name, "top_gaps": [], "suggested_opening_hook": ""}
 
     # ── Step 2: ICP classification ───────────────────────────────────────────
-    from .enrichment.pipeline import _classify_segment
     segment_val = hiring_brief_dict.get("icp_segment") or ICPSegment.UNKNOWN
-    # If not already classified, run classification from brief data
-    if segment_val == ICPSegment.UNKNOWN or not segment_val:
-        segment_val = ICPSegment.UNKNOWN
-    steps.append({"step": "icp_classification", "status": "ok", "segment": segment_val})
-    print(f"[orchestrator] ICP segment: {segment_val}")
+    segment_confidence = hiring_brief_dict.get("icp_confidence", 0.0)
+    steps.append({"step": "icp_classification", "status": "ok", "segment": segment_val, "confidence": segment_confidence})
+    print(f"[orchestrator] ICP segment: {segment_val} (confidence: {segment_confidence:.2f})")
 
     # ── Step 3: Compose email ────────────────────────────────────────────────
     try:
@@ -170,7 +166,7 @@ async def run_prospect_pipeline(
             update_contact_enrichment(
                 contact_id=hubspot_contact_id,
                 icp_segment=str(segment_val),
-                icp_confidence=0.75,  # from classification step
+                icp_confidence=segment_confidence,
                 ai_maturity_score=hiring_brief_dict.get("ai_maturity_score", 0),
                 hiring_signal_summary=hiring_brief_dict.get("brief_summary", "")[:500],
                 crunchbase_id=hiring_brief_dict.get("crunchbase_id"),

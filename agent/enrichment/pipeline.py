@@ -163,6 +163,8 @@ async def enrich_prospect(
         ai_maturity_confidence=maturity["confidence"],
         ai_maturity_justification=maturity["justification"],
         evidence=[SignalEvidence(**e) for e in evidence],
+        icp_segment=segment,
+        icp_confidence=segment_confidence,
         brief_summary=brief_summary,
         pitch_angle=pitch_angle,
         ask_not_assert=ask_not_assert,

@@ -268,16 +268,3 @@ This system is configured for the **challenge week only**. Key constraints:
 
 **Kill switch condition**: Set `LIVE_OUTBOUND_ENABLED=false` and `LIVE_SMS_ENABLED=false` to immediately route all outbound to the staff sink. The system continues to function (enrichment, CRM, calendar) but no real prospects receive messages.
 
----
-
-## Week Plan
-
-| Day | Act | Key Deliverable |
-|-----|-----|----------------|
-| Mon Apr 21 | I + II | τ²-Bench baseline + production stack running |
-| Tue Apr 22 | II | End-to-end email + SMS + CRM + calendar thread complete |
-| **Wed Apr 22 21:00 UTC** | | **Interim submission** |
-| Thu Apr 24 | III | 30+ adversarial probes |
-| Fri Apr 24 | IV | Mechanism design + held-out evaluation |
-| Sat Apr 25 | V | 2-page memo + demo video |
-| **Sat Apr 25 21:00 UTC** | | **Final submission** |
