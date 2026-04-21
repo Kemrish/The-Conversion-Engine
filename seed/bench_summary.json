@@ -1,0 +1,53 @@
+{
+  "last_updated": "2026-04-21",
+  "available_engineers": {
+    "python_backend": {
+      "count": 8,
+      "seniority": {"senior": 3, "mid": 4, "junior": 1},
+      "sub_skills": ["FastAPI", "Django", "PostgreSQL", "Redis", "Celery", "Docker", "AWS"]
+    },
+    "python_ml": {
+      "count": 5,
+      "seniority": {"senior": 2, "mid": 2, "junior": 1},
+      "sub_skills": ["PyTorch", "Transformers", "scikit-learn", "MLflow", "Ray", "LangChain"]
+    },
+    "data_engineering": {
+      "count": 6,
+      "seniority": {"senior": 2, "mid": 3, "junior": 1},
+      "sub_skills": ["dbt", "Airflow", "Spark", "Snowflake", "Databricks", "Kafka", "BigQuery"]
+    },
+    "go_backend": {
+      "count": 4,
+      "seniority": {"senior": 2, "mid": 2, "junior": 0},
+      "sub_skills": ["gRPC", "Kubernetes", "PostgreSQL", "Redis", "microservices"]
+    },
+    "infrastructure_devops": {
+      "count": 5,
+      "seniority": {"senior": 2, "mid": 2, "junior": 1},
+      "sub_skills": ["Terraform", "Kubernetes", "AWS", "GCP", "CI/CD", "Helm"]
+    },
+    "llm_agentic": {
+      "count": 3,
+      "seniority": {"senior": 2, "mid": 1, "junior": 0},
+      "sub_skills": ["LangChain", "LangGraph", "vLLM", "OpenAI API", "Anthropic API", "RAG", "function calling"]
+    },
+    "frontend_react": {
+      "count": 4,
+      "seniority": {"senior": 1, "mid": 2, "junior": 1},
+      "sub_skills": ["React", "TypeScript", "Next.js", "GraphQL", "REST"]
+    }
+  },
+  "total_available": 35,
+  "notes": [
+    "LLM/agentic capacity is limited — only pitch Segment 4 for agentic builds if the project is < 3 engineers",
+    "Data engineering bench is strongest — dbt + Snowflake + Databricks is a clear pitch point",
+    "No mobile engineers currently available",
+    "No Rust engineers currently available",
+    "Go bench is strong for infrastructure-adjacent builds"
+  ],
+  "upcoming_availability": {
+    "python_backend": 2,
+    "data_engineering": 1,
+    "date": "2026-05-15"
+  }
+}

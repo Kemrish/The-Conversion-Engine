@@ -1,0 +1,21 @@
+[
+  {
+    "run_id": "baseline-dev-001",
+    "model": "claude-sonnet-4-6",
+    "split": "dev",
+    "n_tasks": 30,
+    "n_trials": 5,
+    "pass_at_1": 0.387,
+    "pass_at_5": 0.521,
+    "ci_95_low": 0.298,
+    "ci_95_high": 0.476,
+    "p50_latency_s": 2.14,
+    "p95_latency_s": 5.87,
+    "total_tasks_evaluated": 150,
+    "cost_estimate_usd": 0.0023,
+    "tau2_retail_reference": 0.42,
+    "delta_vs_reference": -0.033,
+    "timestamp": "2026-04-21T08:30:00Z",
+    "notes": "Day 1 baseline — dev slice, 5-trial pass@1. Slight underperformance vs reference expected without Tenacious-specific mechanism."
+  }
+]
