@@ -1,0 +1,75 @@
+services:
+  - type: web
+    name: tenacious-conversion-engine
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r agent/requirements.txt
+    startCommand: uvicorn agent.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      # Kill switches — leave false unless staff approves live outbound
+      - key: LIVE_OUTBOUND_ENABLED
+        value: false
+      - key: LIVE_SMS_ENABLED
+        value: false
+      - key: STAFF_SINK_EMAIL
+        value: sink@tenacious-dev.internal
+      - key: STAFF_SINK_PHONE
+        value: "+254700000000"
+
+      # LLM — set your OpenRouter key in Render dashboard
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: anthropic/claude-sonnet-4-6
+      - key: LLM_DEV_MODEL
+        value: qwen/qwen3-235b-a22b
+      - key: OPENROUTER_SITE_URL
+        value: https://tenacious.consulting
+      - key: OPENROUTER_APP_NAME
+        value: Tenacious Conversion Engine
+
+      # Email — Resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        value: outreach@tenacious.consulting
+      - key: FROM_NAME
+        value: Tenacious Consulting
+      - key: REPLY_TO
+        value: outreach@tenacious.consulting
+      # After deploy, set this to: https://<your-render-url>.onrender.com/webhooks/email
+      - key: RESEND_WEBHOOK_URL
+        sync: false
+
+      # SMS — Africa's Talking sandbox
+      - key: AT_USERNAME
+        value: sandbox
+      - key: AT_API_KEY
+        sync: false
+
+      # CRM — HubSpot Developer Sandbox
+      - key: HUBSPOT_ACCESS_TOKEN
+        sync: false
+
+      # Calendar — Cal.com cloud (free plan at cal.com)
+      # Sign up at cal.com, create "Discovery Call (30 min)" event type
+      # API keys at cal.com/settings/developer/api-keys
+      - key: CALCOM_BASE_URL
+        value: https://api.cal.com
+      - key: CALCOM_PUBLIC_URL
+        sync: false   # your cal.com profile URL e.g. https://cal.com/your-username
+      - key: CALCOM_API_KEY
+        sync: false
+      - key: CALCOM_EVENT_TYPE_ID
+        value: "1"
+      - key: CALCOM_USER_ID
+        value: "1"
+
+      # Observability — Langfuse cloud (free at cloud.langfuse.com)
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_HOST
+        value: https://cloud.langfuse.com

@@ -9,7 +9,14 @@ from datetime import datetime, timedelta
 from typing import Optional
 import httpx
 
-CALCOM_BASE_URL = os.environ.get("CALCOM_BASE_URL", "http://localhost:3000")
+_raw_base = os.environ.get("CALCOM_BASE_URL", "http://localhost:3000").rstrip("/")
+# Cal.com cloud API is at https://api.cal.com/v1; self-hosted is at <host>/api/v1
+# Normalise so both work without double-slashing.
+if _raw_base == "https://api.cal.com":
+    CALCOM_API_BASE = "https://api.cal.com/v1"
+else:
+    CALCOM_API_BASE = f"{_raw_base}/api/v1"
+
 CALCOM_API_KEY = os.environ.get("CALCOM_API_KEY", "")
 DISCOVERY_CALL_EVENT_TYPE_ID = int(os.environ.get("CALCOM_EVENT_TYPE_ID", "1"))
 DELIVERY_LEAD_USER_ID = int(os.environ.get("CALCOM_USER_ID", "1"))
@@ -40,7 +47,7 @@ def get_available_slots(
 
     try:
         resp = httpx.get(
-            f"{CALCOM_BASE_URL}/api/v1/slots",
+            f"{CALCOM_API_BASE}/slots",
             headers=_headers(),
             params={
                 "eventTypeId": DISCOVERY_CALL_EVENT_TYPE_ID,
@@ -125,7 +132,7 @@ def create_booking(
 
     try:
         resp = httpx.post(
-            f"{CALCOM_BASE_URL}/api/v1/bookings",
+            f"{CALCOM_API_BASE}/bookings",
             headers=_headers(),
             json=payload,
             timeout=15.0,
@@ -168,7 +175,7 @@ def cancel_booking(booking_uid: str, reason: str = "Prospect requested cancellat
     """Cancel an existing booking."""
     try:
         resp = httpx.delete(
-            f"{CALCOM_BASE_URL}/api/v1/bookings/{booking_uid}",
+            f"{CALCOM_API_BASE}/bookings/{booking_uid}",
             headers=_headers(),
             json={"reason": reason},
             timeout=10.0,
