@@ -16,6 +16,7 @@ from .enrichment.pipeline import enrich_prospect
 from .email.composer import compose_cold_email, tone_check
 from .email.sender import send_email
 from .email.reply_handler import classify_reply
+from .policy import decide as policy_decide
 from .crm.hubspot import (
     create_or_update_contact, update_contact_enrichment,
     create_deal, log_email_sent, log_email_reply,
@@ -262,16 +263,25 @@ async def handle_email_reply(
         hiring_brief_summary="",
     )
 
+    # Apply action policy — fixes dual-control stalling (Act IV mechanism)
+    policy = policy_decide(
+        reply_intent=result.get("intent", "UNCLEAR"),
+        intent_confidence=result.get("confidence", "low"),
+        sequence_day=0,
+        escalation_flags=[],
+    )
+    result["policy_decision"] = policy
+
     if hubspot_contact_id:
         log_email_reply(
             contact_id=hubspot_contact_id,
             reply_text=reply_text,
             intent=result.get("intent", "UNCLEAR"),
-            next_action=result.get("suggested_next_action", "route_to_human"),
+            next_action=policy["action"],
         )
 
-    # If SCHEDULING intent → fetch available slots
-    if result.get("suggested_next_action") == "book_call":
+    # If policy says book_call → fetch available slots immediately
+    if policy["action"] == "book_call":
         slots = get_available_slots(timezone="America/New_York")
         result["available_slots"] = slots[:3]
 

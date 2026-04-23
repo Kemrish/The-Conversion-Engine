@@ -119,13 +119,17 @@ def score_ai_maturity(
     # Build narrative
     narrative = _build_narrative(score, justification, confidence, ai_role_titles or [])
 
+    single_source = len(set(j["signal"] for j in justification)) <= 1
+    ask_not_assert = (confidence == "low" and score >= 2) or (single_source and score >= 2)
+
     return {
         "score": score,
         "confidence": confidence,
         "total_weight": total_weight,
         "justification": justification,
         "narrative": narrative,
-        "ask_not_assert": confidence == "low" and score >= 2,
+        "ask_not_assert": ask_not_assert,
+        "single_source_warning": single_source and score >= 2,
     }
 
 

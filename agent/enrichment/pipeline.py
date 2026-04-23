@@ -229,7 +229,7 @@ def _classify_segment(
                 f"{recent_funding['round_type']} of ${amount/1e6:.1f}M, "
                 f"{eng_roles} open engineering roles, no layoff signal."
             )
-        if recent_funding and eng_roles >= 3 and no_layoff:
+        if in_range and eng_roles >= 3 and no_layoff:
             return (
                 ICPSegment.SEGMENT_1_FUNDED,
                 0.65,
@@ -264,12 +264,12 @@ def _classify_segment(
             f"Mid-market size ({emp_range}) without strong restructuring signal — weak confidence."
         )
 
-    # Segment 1: Any funded company with hiring
-    if recent_funding and eng_roles >= 1:
+    # Segment 1: Any funded company within range with hiring
+    if recent_funding and in_range and eng_roles >= 1:
         return (
             ICPSegment.SEGMENT_1_FUNDED,
             0.50,
-            "Recent funding and open engineering roles — moderate confidence."
+            "Recent funding (within target range) and open engineering roles — moderate confidence."
         )
 
     return (

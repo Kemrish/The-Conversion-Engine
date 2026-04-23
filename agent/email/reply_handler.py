@@ -50,6 +50,9 @@ def classify_reply(
     """
     Classify a prospect's email reply and determine next action.
     """
+    truncated_reply = reply_text[:2000]
+    truncation_note = " [truncated to 2000 chars]" if len(reply_text) > 2000 else ""
+
     user_prompt = f"""Classify this prospect reply.
 
 Original email subject: {original_subject}
@@ -57,8 +60,8 @@ Prospect: {prospect_name} at {company_name}
 ICP Segment: {icp_segment}
 Hiring Signal Brief Summary: {hiring_brief_summary[:500]}
 
-Reply text:
-{reply_text}
+Reply text{truncation_note}:
+{truncated_reply}
 
 Return JSON only.
 """
