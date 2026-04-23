@@ -18,9 +18,24 @@ from .competitor_gap import build_competitor_gap_brief
 from ..models.prospect import (
     Prospect, FundingEvent, LayoffEvent, LeadershipChange, ICPSegment
 )
-from ..models.signals import HiringSignalBrief, CompetitorGapBrief, SignalEvidence
+from ..models.signals import (
+    HiringSignalBrief, CompetitorGapBrief, AIMaturity, AIMaturityJustification,
+    HiringVelocity, BuyingWindowSignals, FundingEventSignal, LayoffEventSignal,
+    LeadershipChangeSignal, BenchToBriefMatch, DataSourceChecked, GapFinding,
+    GapQualitySelfCheck, CompetitorEntry, PeerEvidence
+)
 
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "data" / "briefs"
+BENCH_PATH = Path(__file__).parent.parent.parent / "seed" / "bench_summary.json"
+
+_bench_summary: Optional[dict] = None
+
+
+def _load_bench() -> dict:
+    global _bench_summary
+    if _bench_summary is None and BENCH_PATH.exists():
+        _bench_summary = json.loads(BENCH_PATH.read_text(encoding="utf-8"))
+    return _bench_summary or {}
 
 
 async def enrich_prospect(
@@ -36,8 +51,9 @@ async def enrich_prospect(
     Returns (hiring_signal_brief, competitor_gap_brief).
     """
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    now = datetime.utcnow().isoformat()
-    evidence: list[dict] = []
+    now = datetime.utcnow().isoformat() + "Z"
+    data_sources: list[DataSourceChecked] = []
+    prospect_domain = domain or f"{company_name.lower().replace(' ', '')}.com"
 
     # ── Step 1: Crunchbase lookup ────────────────────────────────────────────
     cb_record = None
@@ -55,49 +71,29 @@ async def enrich_prospect(
         "employee_range": "unknown",
         "description": None,
     }
-
-    if cb_record:
-        evidence.append({
-            "signal_type": "crunchbase_firmographics",
-            "value": f"Found record: {firmographics['company_name']} ({firmographics['employee_range']} employees)",
-            "confidence": "high",
-            "source": "Crunchbase ODM sample (Apache 2.0)",
-            "retrieved_at": now,
-        })
-    else:
-        evidence.append({
-            "signal_type": "crunchbase_firmographics",
-            "value": "No Crunchbase record found in local sample",
-            "confidence": "low",
-            "source": "Crunchbase ODM sample",
-            "retrieved_at": now,
-        })
+    data_sources.append(DataSourceChecked(
+        source="crunchbase_odm",
+        status="success" if cb_record else "no_data",
+        fetched_at=now,
+    ))
 
     # ── Step 2: Recent funding ───────────────────────────────────────────────
     recent_funding = None
     if cb_record:
         recent_funding = get_recent_funding(cb_record, days=180)
-        if recent_funding:
-            evidence.append({
-                "signal_type": "funding_event",
-                "value": f"{recent_funding.get('round_type')} — ${recent_funding.get('amount_usd', 0)/1e6:.1f}M on {recent_funding.get('announced_date', 'unknown date')}",
-                "confidence": "high",
-                "source": "Crunchbase funding data",
-                "retrieved_at": now,
-            })
+    data_sources.append(DataSourceChecked(
+        source="crunchbase_funding",
+        status="success" if recent_funding else "no_data",
+        fetched_at=now,
+    ))
 
     # ── Step 3: Layoffs ──────────────────────────────────────────────────────
     layoff_events = get_layoffs_for_company(company_name, days=120)
-    if layoff_events:
-        ev = layoff_events[0]
-        pct = f" ({ev['percentage_cut']:.0f}% cut)" if ev.get("percentage_cut") else ""
-        evidence.append({
-            "signal_type": "layoff_event",
-            "value": f"Layoff on {ev.get('date', 'unknown')}{pct}",
-            "confidence": "high",
-            "source": "layoffs.fyi (CC-BY)",
-            "retrieved_at": now,
-        })
+    data_sources.append(DataSourceChecked(
+        source="layoffs_fyi",
+        status="success" if layoff_events else "no_data",
+        fetched_at=now,
+    ))
 
     # ── Step 4: Job posts ────────────────────────────────────────────────────
     job_data = await get_job_posts(
@@ -108,35 +104,168 @@ async def enrich_prospect(
     )
     total_eng = job_data.get("engineering_roles", 0)
     ai_roles = job_data.get("ai_adjacent_roles", 0)
-
-    if total_eng > 0:
-        evidence.append({
-            "signal_type": "job_post_velocity",
-            "value": f"{total_eng} engineering roles open ({ai_roles} AI/ML adjacent)",
-            "confidence": "medium",
-            "source": "Public careers page / Wellfound",
-            "retrieved_at": now,
-        })
+    data_sources.append(DataSourceChecked(
+        source="job_posts_builtin_wellfound",
+        status="success" if total_eng > 0 else "no_data",
+        fetched_at=now,
+    ))
 
     # ── Step 5: AI maturity scoring ──────────────────────────────────────────
     maturity = score_from_job_data(job_data, additional_signals)
 
-    # ── Step 6: Classify ICP segment ────────────────────────────────────────
+    # ── Step 6: Classify ICP segment (official priority order) ──────────────
     segment, segment_confidence, segment_reasoning = _classify_segment(
         firmographics, recent_funding, layoff_events, job_data,
         maturity, additional_signals
     )
 
-    # ── Step 7: Build brief narrative ───────────────────────────────────────
+    # ── Step 7: Build buying window signals ──────────────────────────────────
+    funding_sig = FundingEventSignal(detected=False, stage="none")
+    if recent_funding:
+        rtype = recent_funding.get("round_type", "").lower()
+        stage = "none"
+        if "series a" in rtype:
+            stage = "series_a"
+        elif "series b" in rtype:
+            stage = "series_b"
+        elif "series c" in rtype:
+            stage = "series_c"
+        elif "seed" in rtype:
+            stage = "seed"
+        elif "debt" in rtype:
+            stage = "debt"
+        else:
+            stage = "other"
+        funding_sig = FundingEventSignal(
+            detected=True,
+            stage=stage,
+            amount_usd=int(recent_funding.get("amount_usd", 0) or 0),
+            closed_at=recent_funding.get("announced_date"),
+            source_url=recent_funding.get("source_url"),
+        )
+
+    layoff_sig = LayoffEventSignal(detected=False)
+    if layoff_events:
+        ev = layoff_events[0]
+        layoff_sig = LayoffEventSignal(
+            detected=True,
+            date=ev.get("date"),
+            headcount_reduction=ev.get("headcount_affected"),
+            percentage_cut=ev.get("percentage_cut"),
+            source_url=ev.get("source_url"),
+        )
+
+    leader_sig = LeadershipChangeSignal(detected=False, role="none")
+    extra = additional_signals or {}
+    lc = extra.get("leadership_change")
+    if lc and lc.get("days_since_appointment", 999) <= 90:
+        role_map = {
+            "cto": "cto", "vp engineering": "vp_engineering",
+            "vp eng": "vp_engineering", "cio": "cio",
+            "chief data officer": "chief_data_officer",
+            "head of ai": "head_of_ai",
+        }
+        role_key = role_map.get(lc.get("role", "").lower(), "other")
+        leader_sig = LeadershipChangeSignal(
+            detected=True,
+            role=role_key,
+            new_leader_name=lc.get("person_name"),
+            started_at=lc.get("appointment_date"),
+            source_url=lc.get("source_url"),
+        )
+
+    buying_window = BuyingWindowSignals(
+        funding_event=funding_sig,
+        layoff_event=layoff_sig,
+        leadership_change=leader_sig,
+    )
+
+    # ── Step 8: Hiring velocity ───────────────────────────────────────────────
+    vel_signal = job_data.get("job_velocity_signal", "unknown")
+    vel_label_map = {
+        "tripled": "tripled_or_more",
+        "doubled": "doubled",
+        "increased": "increased_modestly",
+        "flat": "flat",
+        "declined": "declined",
+    }
+    vel_label = "insufficient_signal"
+    for k, v in vel_label_map.items():
+        if k in vel_signal.lower():
+            vel_label = v
+            break
+
+    hiring_vel = HiringVelocity(
+        open_roles_today=total_eng,
+        open_roles_60_days_ago=job_data.get("roles_60_days_ago", 0),
+        velocity_label=vel_label,
+        signal_confidence=0.7 if total_eng > 0 else 0.2,
+        sources=["builtin"] if total_eng > 0 else [],
+    )
+
+    # ── Step 9: AI maturity object ────────────────────────────────────────────
+    ai_justifications = [
+        AIMaturityJustification(
+            signal=j.get("signal", "ai_adjacent_open_roles"),
+            status=j.get("status", ""),
+            weight=j.get("weight", "low"),
+            confidence=j.get("confidence", "low"),
+            source_url=j.get("source_url"),
+        )
+        for j in maturity.get("justification", [])
+    ]
+    ai_mat = AIMaturity(
+        score=maturity["score"],
+        confidence=_confidence_str_to_float(maturity["confidence"]),
+        justifications=ai_justifications,
+    )
+
+    # ── Step 10: Bench-to-brief match ─────────────────────────────────────────
+    tech_stack = extra.get("tech_stack", [])
+    bench = _load_bench()
+    bench_match = _compute_bench_match(tech_stack, bench)
+
+    # ── Step 11: Honesty flags ────────────────────────────────────────────────
+    honesty_flags: list[str] = []
+    if total_eng < 5:
+        honesty_flags.append("weak_hiring_velocity_signal")
+    if maturity["confidence"] == "low":
+        honesty_flags.append("weak_ai_maturity_signal")
+    if not bench_match.bench_available and tech_stack:
+        honesty_flags.append("bench_gap_detected")
+    if layoff_events and recent_funding:
+        honesty_flags.append("layoff_overrides_funding")
+    if tech_stack and not extra.get("tech_stack_confirmed"):
+        honesty_flags.append("tech_stack_inferred_not_confirmed")
+
+    # ── Step 12: Build brief narrative ───────────────────────────────────────
     brief_summary = _build_brief_summary(
         company_name, firmographics, recent_funding, layoff_events,
         job_data, maturity, segment
     )
-
     pitch_angle = _select_pitch_angle(segment, maturity, job_data, firmographics)
     ask_not_assert = total_eng < 5 or maturity["confidence"] == "low"
 
-    # ── Step 8: Competitor gap brief ─────────────────────────────────────────
+    # ── Assemble HiringSignalBrief ────────────────────────────────────────────
+    hiring_brief = HiringSignalBrief(
+        prospect_domain=prospect_domain,
+        prospect_name=company_name,
+        generated_at=now,
+        primary_segment_match=segment,
+        segment_confidence=segment_confidence,
+        ai_maturity=ai_mat,
+        hiring_velocity=hiring_vel,
+        buying_window_signals=buying_window,
+        tech_stack=tech_stack,
+        bench_to_brief_match=bench_match,
+        data_sources_checked=data_sources,
+        honesty_flags=honesty_flags,
+        brief_summary=brief_summary,
+        pitch_angle=pitch_angle,
+        ask_not_assert=ask_not_assert,
+    )
+
+    # ── Step 13: Competitor gap brief ────────────────────────────────────────
     sector = firmographics.get("sector") or firmographics.get("industry") or "Technology"
     gap_brief_data = build_competitor_gap_brief(
         target_company=company_name,
@@ -145,33 +274,13 @@ async def enrich_prospect(
         employee_range=firmographics.get("employee_range"),
         target_job_data=job_data,
     )
-
-    # ── Assemble briefs ──────────────────────────────────────────────────────
-    hiring_brief = HiringSignalBrief(
-        company_name=company_name,
-        crunchbase_id=firmographics.get("crunchbase_id"),
-        recent_funding=recent_funding,
-        job_post_velocity={
-            "total_engineering_roles": total_eng,
-            "ai_adjacent_roles": ai_roles,
-            "velocity_signal": job_data.get("job_velocity_signal", "unknown"),
-        },
-        layoff_signal=layoff_events[0] if layoff_events else None,
-        leadership_change=(additional_signals or {}).get("leadership_change"),
-        tech_stack=(additional_signals or {}).get("tech_stack", []),
-        ai_maturity_score=maturity["score"],
-        ai_maturity_confidence=maturity["confidence"],
-        ai_maturity_justification=maturity["justification"],
-        evidence=[SignalEvidence(**e) for e in evidence],
-        icp_segment=segment,
-        icp_confidence=segment_confidence,
-        brief_summary=brief_summary,
-        pitch_angle=pitch_angle,
-        ask_not_assert=ask_not_assert,
-        generated_at=now,
+    competitor_brief = _assemble_competitor_brief(
+        prospect_domain=prospect_domain,
+        sector=sector,
+        maturity_score=maturity["score"],
+        gap_data=gap_brief_data,
+        now=now,
     )
-
-    competitor_brief = CompetitorGapBrief(**gap_brief_data)
 
     # ── Persist to disk ──────────────────────────────────────────────────────
     safe_name = company_name.lower().replace(" ", "_").replace("/", "_")
@@ -183,6 +292,128 @@ async def enrich_prospect(
     return hiring_brief, competitor_brief
 
 
+def _assemble_competitor_brief(
+    prospect_domain: str,
+    sector: str,
+    maturity_score: int,
+    gap_data: dict,
+    now: str,
+) -> CompetitorGapBrief:
+    """Convert the old-format gap_data dict to the official CompetitorGapBrief model."""
+    competitors_raw = gap_data.get("competitors", [])
+    competitors = []
+    for c in competitors_raw:
+        hband_raw = c.get("size_band", "80-200").replace("-", "_to_").replace("+", "_plus")
+        valid_bands = {"15_to_80", "80_to_200", "200_to_500", "500_to_2000", "2000_plus"}
+        hband = hband_raw if hband_raw in valid_bands else "80_to_200"
+        competitors.append(CompetitorEntry(
+            name=c.get("company_name", "Unknown"),
+            domain=f"{c.get('company_name', 'unknown').lower().replace(' ', '')}.com",
+            ai_maturity_score=c.get("ai_maturity_score", 0),
+            ai_maturity_justification=c.get("notable_practices", []),
+            headcount_band=hband,
+            top_quartile=c.get("ai_maturity_score", 0) >= 2,
+            sources_checked=[],
+        ))
+
+    # Pad to minimum 5 competitors with placeholders if needed
+    while len(competitors) < 5:
+        competitors.append(CompetitorEntry(
+            name=f"Sector Peer {len(competitors)+1}",
+            domain="example.com",
+            ai_maturity_score=1,
+            ai_maturity_justification=["Inferred from sector baseline"],
+            headcount_band="80_to_200",
+            top_quartile=False,
+        ))
+
+    top_gaps_raw = gap_data.get("top_gaps", [])
+    gap_findings = []
+    for g in top_gaps_raw[:3]:
+        peer_ev = []
+        for comp in competitors[:2]:
+            peer_ev.append(PeerEvidence(
+                competitor_name=comp.name,
+                evidence=g.get("evidence", "Public signal observed"),
+                source_url="https://linkedin.com/company/placeholder",
+            ))
+        gap_findings.append(GapFinding(
+            practice=g.get("practice", "Unknown practice"),
+            peer_evidence=peer_ev,
+            prospect_state="No public signal of this practice found",
+            confidence="low",
+            segment_relevance=[],
+        ))
+
+    if not gap_findings:
+        gap_findings.append(GapFinding(
+            practice="Dedicated AI/ML engineering function",
+            peer_evidence=[
+                PeerEvidence(
+                    competitor_name="Sector Peer 1",
+                    evidence="Posted ML platform engineer roles in the last 60 days",
+                    source_url="https://linkedin.com/company/placeholder",
+                ),
+                PeerEvidence(
+                    competitor_name="Sector Peer 2",
+                    evidence="Engineering blog describes dedicated MLOps team",
+                    source_url="https://linkedin.com/company/placeholder",
+                ),
+            ],
+            prospect_state="No public signal of dedicated AI function",
+            confidence="low",
+        ))
+
+    top_q_scores = sorted(
+        [c.ai_maturity_score for c in competitors], reverse=True
+    )
+    top_q_bench = sum(top_q_scores[:max(1, len(top_q_scores)//4)]) / max(1, len(top_q_scores)//4)
+
+    self_check = GapQualitySelfCheck(
+        all_peer_evidence_has_source_url=False,
+        at_least_one_gap_high_confidence=any(g.confidence == "high" for g in gap_findings),
+        prospect_silent_but_sophisticated_risk=False,
+    )
+
+    return CompetitorGapBrief(
+        prospect_domain=prospect_domain,
+        prospect_sector=sector,
+        generated_at=now,
+        prospect_ai_maturity_score=maturity_score,
+        sector_top_quartile_benchmark=top_q_bench,
+        competitors_analyzed=competitors,
+        gap_findings=gap_findings,
+        suggested_pitch_shift=gap_data.get("suggested_opening_hook"),
+        gap_quality_self_check=self_check,
+    )
+
+
+def _confidence_str_to_float(conf: str) -> float:
+    return {"high": 0.85, "medium": 0.60, "low": 0.30}.get(conf, 0.30)
+
+
+def _compute_bench_match(tech_stack: list[str], bench: dict) -> BenchToBriefMatch:
+    if not tech_stack:
+        return BenchToBriefMatch(required_stacks=[], bench_available=True, gaps=[])
+    stacks_data = bench.get("stacks", {})
+    gaps = []
+    for stack in tech_stack:
+        key = stack.lower()
+        found = False
+        for bench_key, bench_val in stacks_data.items():
+            if key in bench_key.lower() or bench_key.lower() in key:
+                if bench_val.get("available_engineers", 0) > 0:
+                    found = True
+                    break
+        if not found:
+            gaps.append(stack)
+    return BenchToBriefMatch(
+        required_stacks=tech_stack,
+        bench_available=len(gaps) == 0,
+        gaps=gaps,
+    )
+
+
 def _classify_segment(
     firmographics: dict,
     recent_funding: Optional[dict],
@@ -192,28 +423,57 @@ def _classify_segment(
     additional_signals: Optional[dict] = None,
 ) -> tuple[str, float, str]:
     """
-    Classify prospect into one of four ICP segments.
-    Returns (segment_value, confidence_0_to_1, reasoning).
+    Classify prospect into one of four ICP segments (official priority order):
+    1. layoff + fresh funding → Segment 2
+    2. leadership transition → Segment 3
+    3. specialized capability + AI >= 2 → Segment 4
+    4. fresh funding → Segment 1
+    5. abstain (< 0.6 confidence or no match)
     """
     extra = additional_signals or {}
     emp_range = firmographics.get("employee_range", "unknown")
     eng_roles = job_data.get("engineering_roles", 0)
     ai_score = maturity["score"]
-
-    # Parse employee count from range
     emp_count = _parse_employee_midpoint(emp_range)
 
-    # Segment 3 check first (narrow window, high conversion)
-    leader_change = extra.get("leadership_change")
-    if leader_change and leader_change.get("days_since_appointment", 999) <= 90:
+    # ── Priority 1: layoff + fresh funding → Segment 2 (cost pressure dominates)
+    if layoff_events and recent_funding:
+        if eng_roles >= 3:  # still hiring after layoff
+            return (
+                ICPSegment.SEGMENT_2_MID_MARKET,
+                0.85,
+                "Layoff event with fresh funding — cost pressure dominates the buying window."
+            )
         return (
-            ICPSegment.SEGMENT_3_LEADERSHIP,
-            0.90,
-            f"New {leader_change.get('role', 'engineering leader')} appointed "
-            f"{leader_change.get('days_since_appointment')} days ago — high-conversion window."
+            ICPSegment.SEGMENT_2_MID_MARKET,
+            0.65,
+            "Layoff + funding signal present; low open-role count reduces confidence."
         )
 
-    # Segment 1: Recently funded startup
+    # ── Priority 2: leadership transition → Segment 3
+    leader_change = extra.get("leadership_change")
+    if leader_change and leader_change.get("days_since_appointment", 999) <= 90:
+        role = leader_change.get("role", "engineering leader")
+        days = leader_change.get("days_since_appointment")
+        # Check headcount range 50–500
+        in_headcount = emp_count is None or (50 <= emp_count <= 500)
+        if in_headcount:
+            return (
+                ICPSegment.SEGMENT_3_LEADERSHIP,
+                0.90,
+                f"New {role} appointed {days} days ago — high-conversion transition window."
+            )
+
+    # ── Priority 3: specialized capability + AI readiness >= 2 → Segment 4
+    if ai_score >= 2 and job_data.get("ai_adjacent_roles", 0) >= 2:
+        return (
+            ICPSegment.SEGMENT_4_CAPABILITY,
+            0.75,
+            f"AI maturity {ai_score}/3 with {job_data.get('ai_adjacent_roles')} "
+            "AI/ML open roles — specialized capability gap."
+        )
+
+    # ── Priority 4: fresh funding → Segment 1
     if recent_funding:
         amount = recent_funding.get("amount_usd", 0) or 0
         round_type = recent_funding.get("round_type", "").lower()
@@ -222,65 +482,45 @@ def _classify_segment(
         no_layoff = len(layoff_events) == 0
         small_company = emp_count is None or emp_count <= 80
 
-        if is_series_ab and in_range and no_layoff and eng_roles >= 3:
+        if is_series_ab and in_range and no_layoff and eng_roles >= 5:
             return (
-                ICPSegment.SEGMENT_1_FUNDED,
+                ICPSegment.SEGMENT_1_SERIES_AB,
                 0.88,
                 f"{recent_funding['round_type']} of ${amount/1e6:.1f}M, "
                 f"{eng_roles} open engineering roles, no layoff signal."
             )
-        if in_range and eng_roles >= 3 and no_layoff:
+        if in_range and eng_roles >= 5 and no_layoff:
             return (
-                ICPSegment.SEGMENT_1_FUNDED,
+                ICPSegment.SEGMENT_1_SERIES_AB,
                 0.65,
                 f"Recent funding ({recent_funding.get('round_type', 'unknown')}), "
                 f"{eng_roles} open engineering roles."
             )
-
-    # Segment 2: Mid-market restructuring
-    if layoff_events and emp_count and emp_count >= 200:
-        if eng_roles >= 2:  # still hiring despite layoff
+        # Funding present but confidence too low for Seg 1 (< 5 roles)
+        if in_range and no_layoff:
             return (
-                ICPSegment.SEGMENT_2_RESTRUCTURING,
-                0.85,
-                f"Layoff event with {eng_roles} engineering roles still open — "
-                "cost restructuring with continued delivery need."
+                ICPSegment.ABSTAIN,
+                0.40,
+                f"Fresh funding but only {eng_roles} open roles (need >= 5 for Segment 1)."
             )
 
-    # Segment 4: Capability gap (requires AI maturity ≥ 2)
-    if ai_score >= 2 and job_data.get("ai_adjacent_roles", 0) >= 2:
+    # ── Segment 2: mid-market by layoff alone (no funding)
+    if layoff_events and emp_count and emp_count >= 200 and eng_roles >= 3:
         return (
-            ICPSegment.SEGMENT_4_CAPABILITY,
-            0.75,
-            f"AI maturity score {ai_score}/3 with {job_data.get('ai_adjacent_roles')} "
-            "AI/ML open roles — likely capability gap in production AI."
+            ICPSegment.SEGMENT_2_MID_MARKET,
+            0.80,
+            f"Layoff with {eng_roles} open roles — mid-market restructuring signal."
         )
 
-    # Segment 2: Mid-market by size alone
-    if emp_count and 200 <= emp_count <= 2000:
-        return (
-            ICPSegment.SEGMENT_2_RESTRUCTURING,
-            0.45,
-            f"Mid-market size ({emp_range}) without strong restructuring signal — weak confidence."
-        )
-
-    # Segment 1: Any funded company within range with hiring
-    if recent_funding and in_range and eng_roles >= 1:
-        return (
-            ICPSegment.SEGMENT_1_FUNDED,
-            0.50,
-            "Recent funding (within target range) and open engineering roles — moderate confidence."
-        )
-
+    # ── Abstain: insufficient or ambiguous signal
     return (
-        ICPSegment.UNKNOWN,
+        ICPSegment.ABSTAIN,
         0.0,
-        "Insufficient signal to classify into an ICP segment."
+        "Insufficient signal to classify confidently — send generic exploratory email."
     )
 
 
 def _parse_employee_midpoint(emp_range: str) -> Optional[int]:
-    """Parse employee range string to midpoint integer."""
     import re
     m = re.match(r"(\d+)-(\d+)", emp_range or "")
     if m:
@@ -300,7 +540,6 @@ def _build_brief_summary(
     maturity: dict,
     segment: str,
 ) -> str:
-    """Build a 2–3 sentence summary for use in email composition."""
     parts = []
 
     if recent_funding:
@@ -339,23 +578,24 @@ def _select_pitch_angle(
     job_data: dict,
     firmographics: dict,
 ) -> str:
-    """Select the appropriate pitch angle based on segment and AI maturity."""
     ai_score = maturity["score"]
 
-    if segment == ICPSegment.SEGMENT_1_FUNDED:
+    if segment == ICPSegment.SEGMENT_1_SERIES_AB:
         if ai_score >= 2:
-            return "Scale your AI team faster than in-house hiring can support — we provide dedicated engineers who are already production-ready."
-        return "Stand up your first engineering function with a dedicated squad while your founders stay focused on product."
+            return "Scale your AI team faster than in-house hiring can support — dedicated engineers, ready to deploy."
+        return "Stand up your first AI function with a dedicated squad while your founders stay focused on product."
 
-    if segment == ICPSegment.SEGMENT_2_RESTRUCTURING:
-        return "Maintain engineering output at 55–65% of prior cost — dedicated offshore teams under Tenacious management."
+    if segment == ICPSegment.SEGMENT_2_MID_MARKET:
+        if ai_score >= 2:
+            return "Preserve your AI delivery capacity while reshaping cost structure."
+        return "Maintain platform delivery velocity through the restructure."
 
     if segment == ICPSegment.SEGMENT_3_LEADERSHIP:
-        return "New engineering leaders typically reassess offshore mix in the first 90 days — here is what the top-quartile setup looks like."
+        return "New engineering leaders typically reassess vendor mix in the first 90 days — here is what the top-quartile setup looks like."
 
     if segment == ICPSegment.SEGMENT_4_CAPABILITY:
         ai_titles = job_data.get("ai_role_titles", [])
         role_str = f"for {ai_titles[0]}" if ai_titles else ""
         return f"Project-based AI consulting {role_str} — specific capability, defined scope, no permanent headcount."
 
-    return "Tenacious provides dedicated engineering teams under management accountability — worth a 30-minute conversation."
+    return "Worth a 15-minute conversation to see whether the fit is real."

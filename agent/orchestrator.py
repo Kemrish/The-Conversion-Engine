@@ -102,17 +102,18 @@ async def run_prospect_pipeline(
         )
         hiring_brief_dict = hiring_brief.dict()
         gap_brief_dict = gap_brief.dict()
-        steps.append({"step": "enrichment", "status": "ok", "ai_maturity": hiring_brief.ai_maturity_score})
-        print(f"[orchestrator] Enrichment complete — AI maturity: {hiring_brief.ai_maturity_score}/3")
+        _ai_score = hiring_brief.ai_maturity.score if hasattr(hiring_brief.ai_maturity, "score") else 0
+        steps.append({"step": "enrichment", "status": "ok", "ai_maturity": _ai_score})
+        print(f"[orchestrator] Enrichment complete — AI maturity: {_ai_score}/3")
     except Exception as e:
         steps.append({"step": "enrichment", "status": "error", "error": str(e)})
         print(f"[orchestrator] Enrichment failed: {e}")
-        hiring_brief_dict = {"company_name": company_name, "ai_maturity_score": 0, "ask_not_assert": True, "brief_summary": "", "pitch_angle": ""}
-        gap_brief_dict = {"target_company": company_name, "top_gaps": [], "suggested_opening_hook": ""}
+        hiring_brief_dict = {"prospect_name": company_name, "ai_maturity": {"score": 0}, "ask_not_assert": True, "brief_summary": "", "pitch_angle": "", "primary_segment_match": "abstain", "segment_confidence": 0.0}
+        gap_brief_dict = {"prospect_domain": "", "gap_findings": [], "suggested_pitch_shift": ""}
 
     # ── Step 2: ICP classification ───────────────────────────────────────────
-    segment_val = hiring_brief_dict.get("icp_segment") or ICPSegment.UNKNOWN
-    segment_confidence = hiring_brief_dict.get("icp_confidence", 0.0)
+    segment_val = hiring_brief_dict.get("primary_segment_match") or ICPSegment.UNKNOWN
+    segment_confidence = hiring_brief_dict.get("segment_confidence", 0.0)
     steps.append({"step": "icp_classification", "status": "ok", "segment": segment_val, "confidence": segment_confidence})
     print(f"[orchestrator] ICP segment: {segment_val} (confidence: {segment_confidence:.2f})")
 
@@ -168,9 +169,9 @@ async def run_prospect_pipeline(
                 contact_id=hubspot_contact_id,
                 icp_segment=str(segment_val),
                 icp_confidence=segment_confidence,
-                ai_maturity_score=hiring_brief_dict.get("ai_maturity_score", 0),
+                ai_maturity_score=(hiring_brief_dict.get("ai_maturity") or {}).get("score", 0),
                 hiring_signal_summary=hiring_brief_dict.get("brief_summary", "")[:500],
-                crunchbase_id=hiring_brief_dict.get("crunchbase_id"),
+                crunchbase_id=None,
             )
 
             create_deal(
@@ -224,7 +225,7 @@ async def run_prospect_pipeline(
         "pipeline_start": pipeline_start,
         "pipeline_end": datetime.utcnow().isoformat(),
         "icp_segment": str(segment_val),
-        "ai_maturity_score": hiring_brief_dict.get("ai_maturity_score", 0),
+        "ai_maturity_score": (hiring_brief_dict.get("ai_maturity") or {}).get("score", 0),
         "email_subject": email_result.get("subject", ""),
         "email_sent": email_send_result.get("success", False),
         "hubspot_contact_id": hubspot_contact_id,
@@ -232,11 +233,12 @@ async def run_prospect_pipeline(
         "dry_run": dry_run,
     }
 
+    _ai_mat_score = (hiring_brief_dict.get("ai_maturity") or {}).get("score", 0)
     _trace(
         name="prospect_pipeline",
         input_data={"company_name": company_name, "contact_email": contact_email},
         output_data=trace_output,
-        metadata={"segment": str(segment_val), "ai_maturity": hiring_brief_dict.get("ai_maturity_score", 0)},
+        metadata={"segment": str(segment_val), "ai_maturity": _ai_mat_score},
     )
 
     return trace_output

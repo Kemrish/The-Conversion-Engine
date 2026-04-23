@@ -54,7 +54,8 @@ CRITICAL CONSTRAINTS:
 - Never open with "I hope this finds you well"
 - Never use: synergies, leverage, circle back, bandwidth, deep dive, game-changer
 - Subject line must follow the segment-specific pattern from the style guide
-- Keep emails under 200 words (body only, excluding signature)
+- Keep emails under 120 words (body only, excluding signature)
+- Subject line must be under 60 characters (Gmail truncates above this on mobile)
 - The email must contain one verifiable fact, one specific gap, one case study reference (anonymized), one low-friction ask
 
 Output format: JSON with keys: subject, body, tone_check_passed (boolean), confidence_flags (list of strings where you hedged language)
@@ -83,13 +84,11 @@ def compose_cold_email(
 
 ## Competitor Gap Brief (top 3 gaps)
 {json.dumps({
-    "target_company": competitor_gap_brief.get("target_company"),
-    "target_ai_maturity": competitor_gap_brief.get("target_ai_maturity"),
-    "sector_median_maturity": competitor_gap_brief.get("sector_median_maturity"),
-    "sector_top_quartile_maturity": competitor_gap_brief.get("sector_top_quartile_maturity"),
-    "target_percentile": competitor_gap_brief.get("target_percentile"),
-    "top_gaps": competitor_gap_brief.get("top_gaps", [])[:3],
-    "suggested_opening_hook": competitor_gap_brief.get("suggested_opening_hook"),
+    "prospect_domain": competitor_gap_brief.get("prospect_domain"),
+    "prospect_ai_maturity_score": competitor_gap_brief.get("prospect_ai_maturity_score"),
+    "sector_top_quartile_benchmark": competitor_gap_brief.get("sector_top_quartile_benchmark"),
+    "gap_findings": competitor_gap_brief.get("gap_findings", [])[:3],
+    "suggested_pitch_shift": competitor_gap_brief.get("suggested_pitch_shift"),
 }, indent=2)}
 
 ## Recipient
@@ -121,7 +120,7 @@ Write the email now. Return ONLY valid JSON with keys: subject, body, tone_check
     except json.JSONDecodeError:
         # Fallback: extract subject and body manually
         result = {
-            "subject": f"Research finding: {competitor_gap_brief.get('suggested_opening_hook', 'your AI roadmap')}",
+            "subject": f"Research finding: {competitor_gap_brief.get('suggested_pitch_shift', 'your AI roadmap')[:40]}",
             "body": raw,
             "tone_check_passed": False,
             "confidence_flags": ["json_parse_error"],
@@ -130,7 +129,7 @@ Write the email now. Return ONLY valid JSON with keys: subject, body, tone_check
     result["metadata"] = {
         "segment": segment,
         "sequence_day": sequence_day,
-        "ai_maturity_score": hiring_brief.get("ai_maturity_score", 0),
+        "ai_maturity_score": (hiring_brief.get("ai_maturity") or {}).get("score", hiring_brief.get("ai_maturity_score", 0)),
         "ask_not_assert": hiring_brief.get("ask_not_assert", False),
         "model": model or DEFAULT_MODEL,
         "draft": True,  # Required by data handling policy

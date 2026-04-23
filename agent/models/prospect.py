@@ -6,10 +6,11 @@ from pydantic import BaseModel, Field
 
 
 class ICPSegment(str, Enum):
-    SEGMENT_1_FUNDED = "segment_1_recently_funded"
-    SEGMENT_2_RESTRUCTURING = "segment_2_mid_market_restructuring"
+    SEGMENT_1_SERIES_AB = "segment_1_series_a_b"
+    SEGMENT_2_MID_MARKET = "segment_2_mid_market_restructure"
     SEGMENT_3_LEADERSHIP = "segment_3_leadership_transition"
-    SEGMENT_4_CAPABILITY = "segment_4_capability_gap"
+    SEGMENT_4_CAPABILITY = "segment_4_specialized_capability"
+    ABSTAIN = "abstain"
     DISQUALIFIED = "disqualified"
     UNKNOWN = "unknown"
 

@@ -18,7 +18,7 @@ RUN playwright install chromium --with-deps
 COPY . .
 
 # Kill switch is OFF by default (data handling policy)
-ENV LIVE_OUTBOUND_ENABLED=false
+ENV TENACIOUS_OUTBOUND_ENABLED=false
 ENV LIVE_SMS_ENABLED=false
 
 CMD ["uvicorn", "agent.main:app", "--host", "0.0.0.0", "--port", "8000"]

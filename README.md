@@ -2,7 +2,7 @@
 ## Automated Lead Generation and Conversion System for Tenacious Consulting and Outsourcing
 
 > **Data Handling**: All outbound is routed to a staff-controlled sink by default.  
-> `LIVE_OUTBOUND_ENABLED=false` and `LIVE_SMS_ENABLED=false` must be explicitly set to `true`  
+> `TENACIOUS_OUTBOUND_ENABLED=false` and `TENACIOUS_SMS_ENABLED=false` must be explicitly set to `true`  
 > to reach real prospects. Do not change these without program staff approval.
 
 ---
@@ -258,13 +258,13 @@ Do not run against the sealed 20-task held-out partition during development.
 
 This system is configured for the **challenge week only**. Key constraints:
 
-- `LIVE_OUTBOUND_ENABLED` defaults to `false` — all email routes to `STAFF_SINK_EMAIL`
-- `LIVE_SMS_ENABLED` defaults to `false` — all SMS routes to `STAFF_SINK_PHONE`
+- `TENACIOUS_OUTBOUND_ENABLED` defaults to `false` — all email routes to `STAFF_SINK_EMAIL`
+- `TENACIOUS_SMS_ENABLED` defaults to `false` — all SMS routes to `STAFF_SINK_PHONE`
 - All outbound emails are tagged `draft: true` in Resend metadata
 - No real Tenacious customer data is stored or processed
 - Every prospect during the challenge week is synthetic
 - Seed materials (sales deck, case studies, pricing) must be deleted from personal infrastructure after the challenge week
 - This README must accompany any production deployment and the kill switches must be documented to operators
 
-**Kill switch condition**: Set `LIVE_OUTBOUND_ENABLED=false` and `LIVE_SMS_ENABLED=false` to immediately route all outbound to the staff sink. The system continues to function (enrichment, CRM, calendar) but no real prospects receive messages.
+**Kill switch condition**: Set `TENACIOUS_OUTBOUND_ENABLED=false` and `TENACIOUS_SMS_ENABLED=false` to immediately route all outbound to the staff sink. The system continues to function (enrichment, CRM, calendar) but no real prospects receive messages.
 

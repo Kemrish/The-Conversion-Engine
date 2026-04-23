@@ -195,13 +195,16 @@ def build_booking_brief(
     Build the discovery call brief attached to a Cal.com booking.
     Includes segment, key signals, AI maturity, and recommended opening question.
     """
-    company = hiring_signal_brief.get("company_name", "Prospect")
-    ai_score = hiring_signal_brief.get("ai_maturity_score", 0)
-    ai_conf = hiring_signal_brief.get("ai_maturity_confidence", "unknown")
+    company = hiring_signal_brief.get("prospect_name", hiring_signal_brief.get("company_name", "Prospect"))
+    _ai_mat = hiring_signal_brief.get("ai_maturity") or {}
+    ai_score = _ai_mat.get("score", 0)
+    ai_conf_float = _ai_mat.get("confidence", 0.0)
+    ai_conf = "high" if ai_conf_float >= 0.7 else ("medium" if ai_conf_float >= 0.5 else "low")
     summary = hiring_signal_brief.get("brief_summary", "")
     pitch = hiring_signal_brief.get("pitch_angle", "")
-    top_gaps = competitor_gap_brief.get("top_gaps", [])[:2]
-    hook = competitor_gap_brief.get("suggested_opening_hook", "")
+    gap_findings = competitor_gap_brief.get("gap_findings", [])[:2]
+    top_gaps = [{"practice": g.get("practice", ""), "business_impact": g.get("prospect_state", "")} for g in gap_findings]
+    hook = competitor_gap_brief.get("suggested_pitch_shift", "")
 
     gaps_str = ""
     for g in top_gaps:

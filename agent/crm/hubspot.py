@@ -46,6 +46,7 @@ def create_or_update_contact(
         "lastname": last_name,
         "company": company,
         "jobtitle": title,
+        "tenacious_status": "draft",
     }
     if phone:
         props["phone"] = phone
@@ -89,6 +90,7 @@ def update_contact_enrichment(
         "tenacious_ai_maturity_score": str(ai_maturity_score),
         "tenacious_hiring_signal_summary": hiring_signal_summary[:500],
         "tenacious_last_enriched_at": enriched_at,
+        "tenacious_status": "draft",
     }
     if crunchbase_id:
         props["tenacious_crunchbase_id"] = crunchbase_id

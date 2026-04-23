@@ -14,7 +14,7 @@ REPLY_TO = os.environ.get("REPLY_TO", "outreach@tenacious.consulting")
 WEBHOOK_URL = os.environ.get("RESEND_WEBHOOK_URL", "")
 
 # Kill switch: when unset, route all outbound to staff sink
-LIVE_OUTBOUND_ENABLED = os.environ.get("LIVE_OUTBOUND_ENABLED", "false").lower() == "true"
+TENACIOUS_OUTBOUND_ENABLED = os.environ.get("TENACIOUS_OUTBOUND_ENABLED", "false").lower() == "true"
 STAFF_SINK_EMAIL = os.environ.get("STAFF_SINK_EMAIL", "sink@tenacious-dev.internal")
 
 
@@ -34,14 +34,14 @@ def send_email(
 ) -> dict:
     """
     Send an outbound email via Resend.
-    Respects the kill switch: routes to staff sink unless LIVE_OUTBOUND_ENABLED=true.
+    Respects the kill switch: routes to staff sink unless TENACIOUS_OUTBOUND_ENABLED=true.
     All outbound is tagged as 'draft' per data handling policy.
     """
     _init_resend()
 
     # Kill switch enforcement
-    actual_recipient = to_email if LIVE_OUTBOUND_ENABLED else STAFF_SINK_EMAIL
-    if not LIVE_OUTBOUND_ENABLED:
+    actual_recipient = to_email if TENACIOUS_OUTBOUND_ENABLED else STAFF_SINK_EMAIL
+    if not TENACIOUS_OUTBOUND_ENABLED:
         subject = f"[SANDBOX → {to_email}] {subject}"
 
     tags = [{"name": "draft", "value": "true"}]
@@ -64,8 +64,8 @@ def send_email(
             "success": True,
             "message_id": result.get("id"),
             "recipient": actual_recipient,
-            "live_outbound": LIVE_OUTBOUND_ENABLED,
-            "sandbox_routed": not LIVE_OUTBOUND_ENABLED,
+            "live_outbound": TENACIOUS_OUTBOUND_ENABLED,
+            "sandbox_routed": not TENACIOUS_OUTBOUND_ENABLED,
         }
     except Exception as e:
         return {
