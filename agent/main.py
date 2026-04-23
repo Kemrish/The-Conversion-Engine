@@ -22,8 +22,11 @@ from .orchestrator import (
     handle_email_reply,
     book_discovery_call,
 )
-from .email.reply_handler import parse_resend_webhook
-from .sms.handler import parse_at_webhook, classify_sms_reply
+from .email.reply_handler import (
+    parse_resend_webhook, validate_resend_webhook,
+    WebhookValidationError, register_reply_handler, dispatch_reply_event,
+)
+from .sms.handler import parse_at_webhook, validate_at_webhook, classify_sms_reply, dispatch_sms_action
 from .enrichment.pipeline import enrich_prospect
 from .crm.hubspot import log_sms_sent
 from .calendar.calcom import get_available_slots
@@ -33,6 +36,13 @@ app = FastAPI(
     description="Automated lead generation and conversion for Tenacious Consulting and Outsourcing",
     version="1.0.0",
 )
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    # Wire the orchestrator's reply handler into the email webhook dispatch chain.
+    # This is the single explicit integration point: webhook → dispatcher → orchestrator.
+    register_reply_handler(handle_email_reply)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
@@ -143,66 +153,82 @@ async def enrich(req: EnrichRequest):
 async def email_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Resend email event webhook.
-    Handles reply events and triggers reply classification.
+    Validates payload structure, then dispatches to the registered reply handler.
     """
-    payload = await request.json()
-    event = parse_resend_webhook(payload)
-
-    # For reply events (Resend sends 'email.received' or similar)
-    if event.get("event_type") in ("email.received", "email.replied"):
-        prospect_id = event.get("tags", {}).get("prospect_id")
-        hubspot_id = event.get("tags", {}).get("hubspot_contact_id")
-        background_tasks.add_task(
-            handle_email_reply,
-            reply_text=payload.get("data", {}).get("text", ""),
-            from_email=event.get("recipient", ""),
-            original_subject=event.get("subject", ""),
-            prospect_id=prospect_id,
-            hubspot_contact_id=hubspot_id,
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "invalid_json", "reason": str(exc), "timestamp": datetime.utcnow().isoformat()},
         )
 
-    return {"status": "received", "event_type": event.get("event_type")}
+    try:
+        event = parse_resend_webhook(payload)   # validates + normalises
+    except WebhookValidationError as exc:
+        return JSONResponse(status_code=422, content=exc.to_response())
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "webhook_parse_error", "reason": str(exc), "timestamp": datetime.utcnow().isoformat()},
+        )
+
+    raw_text = payload.get("data", {}).get("text", "")
+    # dispatch_reply_event is the explicit integration point: event → orchestrator
+    background_tasks.add_task(dispatch_reply_event, event, raw_text)
+
+    return JSONResponse({"status": "accepted", "event_type": event.get("event_type")})
 
 
 # ── SMS webhook ───────────────────────────────────────────────────────────────
 
 @app.post("/webhooks/sms")
-async def sms_webhook(request: Request):
+async def sms_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Africa's Talking inbound SMS webhook.
-    Handles STOP commands, scheduling replies, and intent classification.
+    Validates payload, classifies intent, then routes via dispatch_sms_action.
     """
-    # AT sends form data
     try:
         body = await request.form()
         payload = dict(body)
     except Exception:
-        payload = await request.json()
+        try:
+            payload = await request.json()
+        except Exception as exc:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "invalid_payload", "reason": str(exc), "timestamp": datetime.utcnow().isoformat()},
+            )
 
-    at_event = parse_at_webhook(payload)
+    from .sms.handler import SMSWebhookValidationError
+    try:
+        at_event = parse_at_webhook(payload)
+    except SMSWebhookValidationError as exc:
+        return JSONResponse(status_code=422, content=exc.to_response())
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "sms_parse_error", "reason": str(exc), "timestamp": datetime.utcnow().isoformat()},
+        )
+
     message_text = at_event.get("text", "")
     from_phone = at_event.get("from", "")
-
     classification = classify_sms_reply(message_text)
 
-    # Log STOP commands immediately
-    if classification.get("action") == "unsubscribe_immediately":
-        return JSONResponse({"status": "unsubscribed", "phone": from_phone})
-
-    # If scheduling confirmation → fetch slots and book
+    # Slots needed for scheduling replies — fetch before dispatch
+    slots = []
     if classification.get("action") == "book_call":
         slots = get_available_slots()
-        return JSONResponse({
-            "status": "scheduling",
-            "suggested_slots": slots[:3],
-            "classification": classification,
-        })
+
+    # Explicit downstream dispatch — routes action to orchestrator/CRM
+    background_tasks.add_task(dispatch_sms_action, classification, from_phone)
 
     return JSONResponse({
-        "status": "processed",
+        "status": "accepted",
         "from": from_phone,
         "intent": classification.get("intent"),
         "action": classification.get("action"),
+        **({"suggested_slots": slots[:3]} if slots else {}),
     })
 
 

@@ -4,10 +4,15 @@ Self-hosted Cal.com via Docker Compose.
 Creates bookings, checks availability, and sends confirmation.
 """
 from __future__ import annotations
+import hashlib
+import logging
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 import httpx
+
+logger = logging.getLogger(__name__)
 
 _raw_base = os.environ.get("CALCOM_BASE_URL", "http://localhost:3000").rstrip("/")
 # Cal.com cloud API is at https://api.cal.com/v1; self-hosted is at <host>/api/v1
@@ -24,11 +29,50 @@ DELIVERY_LEAD_USER_ID = int(os.environ.get("CALCOM_USER_ID", "1"))
 CALCOM_PUBLIC_URL = os.environ.get("CALCOM_PUBLIC_URL", "http://localhost:3000")
 
 
-def _headers() -> dict:
-    return {
+def _headers(idempotency_key: Optional[str] = None) -> dict:
+    h = {
         "Authorization": f"Bearer {CALCOM_API_KEY}",
         "Content-Type": "application/json",
     }
+    if idempotency_key:
+        h["Idempotency-Key"] = idempotency_key
+    return h
+
+
+def _retry_get(url: str, **kwargs) -> httpx.Response:
+    """GET with up to 3 retries on 5xx / network errors."""
+    for attempt in range(3):
+        try:
+            resp = httpx.get(url, **kwargs)
+            if resp.status_code < 500:
+                return resp
+            wait = 1.0 * (2 ** attempt)
+            logger.warning("[calcom] GET %s returned %s — retrying in %.1fs", url, resp.status_code, wait)
+            time.sleep(wait)
+        except httpx.TransportError as exc:
+            if attempt == 2:
+                raise
+            logger.warning("[calcom] Network error on attempt %d: %s", attempt + 1, exc)
+            time.sleep(1.0 * (2 ** attempt))
+    raise httpx.HTTPError(f"GET {url} failed after 3 attempts")
+
+
+def _retry_post(url: str, **kwargs) -> httpx.Response:
+    """POST with up to 3 retries on 5xx / network errors."""
+    for attempt in range(3):
+        try:
+            resp = httpx.post(url, **kwargs)
+            if resp.status_code < 500:
+                return resp
+            wait = 1.0 * (2 ** attempt)
+            logger.warning("[calcom] POST %s returned %s — retrying in %.1fs", url, resp.status_code, wait)
+            time.sleep(wait)
+        except httpx.TransportError as exc:
+            if attempt == 2:
+                raise
+            logger.warning("[calcom] Network error on attempt %d: %s", attempt + 1, exc)
+            time.sleep(1.0 * (2 ** attempt))
+    raise httpx.HTTPError(f"POST {url} failed after 3 attempts")
 
 
 def get_available_slots(
@@ -46,7 +90,7 @@ def get_available_slots(
         date_to = (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d")
 
     try:
-        resp = httpx.get(
+        resp = _retry_get(
             f"{CALCOM_API_BASE}/slots",
             headers=_headers(),
             params={
@@ -67,9 +111,10 @@ def get_available_slots(
                         "start": start,
                         "formatted": _format_slot(start, timezone),
                     })
-            return slots[:8]  # Return next 8 available slots
+            return slots[:8]
+        logger.warning("[calcom] get_available_slots returned %s", resp.status_code)
     except Exception as e:
-        print(f"[calcom] Failed to fetch slots: {e}")
+        logger.warning("[calcom] Failed to fetch slots: %s", e)
 
     # Fallback: generate mock slots for testing
     return _generate_mock_slots(timezone)
@@ -112,6 +157,13 @@ def create_booking(
     Create a Cal.com booking for a discovery call.
     Returns booking UID, confirmation URL, and formatted time.
     """
+    # Idempotency key: deterministic hash of (email, start_time, event_type_id).
+    # Repeated calls for the same booking return the same key, preventing duplicates
+    # if the webhook fires more than once or the orchestrator retries.
+    idempotency_key = hashlib.sha256(
+        f"{attendee_email}|{start_time}|{event_type_id}".encode()
+    ).hexdigest()[:32]
+
     payload = {
         "eventTypeId": event_type_id,
         "start": start_time,
@@ -124,16 +176,17 @@ def create_booking(
         "language": "en",
         "metadata": {
             "source": "tenacious_conversion_engine",
-            "draft": "true",  # data handling policy
+            "draft": "true",
+            "idempotency_key": idempotency_key,
         },
     }
     if attendee_phone:
         payload["responses"]["phone"] = attendee_phone
 
     try:
-        resp = httpx.post(
+        resp = _retry_post(
             f"{CALCOM_API_BASE}/bookings",
-            headers=_headers(),
+            headers=_headers(idempotency_key=idempotency_key),
             json=payload,
             timeout=15.0,
         )

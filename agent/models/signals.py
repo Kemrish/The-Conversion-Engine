@@ -64,6 +64,7 @@ class BenchToBriefMatch(BaseModel):
 class DataSourceChecked(BaseModel):
     source: str
     status: str  # "success", "partial", "no_data", "error", "rate_limited"
+    signal_confidence: float = 0.0  # confidence in this source's output (0.0–1.0)
     error_message: Optional[str] = None
     fetched_at: Optional[str] = None
 

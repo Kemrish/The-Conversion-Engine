@@ -4,18 +4,24 @@ Uses hubspot-api-client to manage contacts, deals, and activity notes.
 Every conversation event is written to HubSpot with enrichment timestamps.
 """
 from __future__ import annotations
+import logging
 import os
+import time
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TypeVar, Callable
 import hubspot
 from hubspot.crm.contacts import SimplePublicObjectInputForCreate, ApiException
 from hubspot.crm.deals import SimplePublicObjectInputForCreate as DealInput
 from hubspot.crm.timeline import TimelineEvent, TimelineEventTemplateToken
 
+logger = logging.getLogger(__name__)
+
 HUBSPOT_ACCESS_TOKEN = os.environ.get("HUBSPOT_ACCESS_TOKEN", "")
 HUBSPOT_APP_ID = os.environ.get("HUBSPOT_APP_ID", "")
 
 _client: Optional[hubspot.Client] = None
+
+T = TypeVar("T")
 
 
 def _get_client() -> hubspot.Client:
@@ -25,6 +31,25 @@ def _get_client() -> hubspot.Client:
             raise ValueError("HUBSPOT_ACCESS_TOKEN environment variable not set")
         _client = hubspot.Client.create(access_token=HUBSPOT_ACCESS_TOKEN)
     return _client
+
+
+def _retry(fn: Callable[[], T], retries: int = 3, backoff: float = 1.0) -> T:
+    """
+    Retry a HubSpot API call up to `retries` times with exponential backoff.
+    Re-raises on the final attempt.
+    """
+    for attempt in range(retries):
+        try:
+            return fn()
+        except ApiException as exc:
+            # 429 = rate limit, 5xx = server error — both are retryable
+            if exc.status in (429, 500, 502, 503, 504) and attempt < retries - 1:
+                wait = backoff * (2 ** attempt)
+                logger.warning("[hubspot] API error %s on attempt %d — retrying in %.1fs", exc.status, attempt + 1, wait)
+                time.sleep(wait)
+            else:
+                raise
+    raise RuntimeError("unreachable")
 
 
 # ── Contact management ────────────────────────────────────────────────────────
@@ -54,19 +79,15 @@ def create_or_update_contact(
         props.update(properties)
 
     try:
-        # Try to find existing contact by email
-        existing = client.crm.contacts.basic_api.get_by_id(
+        existing = _retry(lambda: client.crm.contacts.basic_api.get_by_id(
             email, id_property="email", properties=list(props.keys())
-        )
-        # Update existing
-        update_input = {"properties": props}
-        client.crm.contacts.basic_api.update(existing.id, {"properties": props})
+        ))
+        _retry(lambda: client.crm.contacts.basic_api.update(existing.id, {"properties": props}))
         return {"contact_id": existing.id, "action": "updated", "email": email}
     except ApiException as e:
         if e.status == 404:
-            # Create new contact
             contact_input = SimplePublicObjectInputForCreate(properties=props)
-            new_contact = client.crm.contacts.basic_api.create(contact_input)
+            new_contact = _retry(lambda: client.crm.contacts.basic_api.create(contact_input))
             return {"contact_id": new_contact.id, "action": "created", "email": email}
         raise
 
@@ -96,9 +117,10 @@ def update_contact_enrichment(
         props["tenacious_crunchbase_id"] = crunchbase_id
 
     try:
-        client.crm.contacts.basic_api.update(contact_id, {"properties": props})
+        _retry(lambda: client.crm.contacts.basic_api.update(contact_id, {"properties": props}))
         return {"success": True, "contact_id": contact_id, "enriched_at": enriched_at}
     except ApiException as e:
+        logger.error("[hubspot] update_contact_enrichment failed for %s: %s", contact_id, e)
         return {"success": False, "error": str(e), "contact_id": contact_id}
 
 
@@ -124,16 +146,32 @@ def create_deal(
         props["amount"] = str(amount)
 
     try:
-        deal_input = DealInput(properties=props)
-        deal = client.crm.deals.basic_api.create(deal_input)
+        # Idempotency: search for an existing open deal with the same name
+        # before creating, so repeated pipeline runs don't create duplicates.
+        search_body = {
+            "filterGroups": [{"filters": [
+                {"propertyName": "dealname", "operator": "EQ", "value": deal_name}
+            ]}],
+            "properties": ["dealname", "dealstage"],
+            "limit": 1,
+        }
+        existing_deals = _retry(lambda: client.crm.deals.search_api.do_search(
+            public_object_search_request=search_body
+        ))
+        if existing_deals.results:
+            existing_deal = existing_deals.results[0]
+            logger.info("[hubspot] Deal '%s' already exists (id=%s) — skipping create", deal_name, existing_deal.id)
+            return {"success": True, "deal_id": existing_deal.id, "deal_name": deal_name, "action": "existing"}
 
-        # Associate deal with contact
-        client.crm.deals.associations_api.create(
+        deal_input = DealInput(properties=props)
+        deal = _retry(lambda: client.crm.deals.basic_api.create(deal_input))
+        _retry(lambda: client.crm.deals.associations_api.create(
             deal.id, "contacts", contact_id,
             [{"associationCategory": "HUBSPOT_DEFINED", "associationTypeId": 3}]
-        )
-        return {"success": True, "deal_id": deal.id, "deal_name": deal_name}
+        ))
+        return {"success": True, "deal_id": deal.id, "deal_name": deal_name, "action": "created"}
     except ApiException as e:
+        logger.error("[hubspot] create_deal failed for %s: %s", company_name, e)
         return {"success": False, "error": str(e)}
 
 

@@ -155,6 +155,72 @@ def get_employee_band(record: dict) -> str:
     return "unknown"
 
 
+def get_leadership_changes(record: dict, days: int = 90) -> list[dict]:
+    """
+    Autonomously detect recent CTO/VP Engineering appointments from a Crunchbase record.
+    Reads from the 'people' or 'founders' fields present in ODM data.
+    Returns a list of detected leadership changes within the window.
+    """
+    TARGET_TITLES = {
+        "cto", "chief technology officer",
+        "vp engineering", "vp of engineering", "vice president engineering",
+        "vp eng", "head of engineering",
+        "cio", "chief information officer",
+        "chief data officer", "cdo",
+        "head of ai", "vp ai", "vp data",
+    }
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    changes = []
+
+    people_sources = []
+    if record.get("people"):
+        people_sources.extend(record["people"] if isinstance(record["people"], list) else [])
+    if record.get("founders"):
+        people_sources.extend(record["founders"] if isinstance(record["founders"], list) else [])
+    if record.get("leadership"):
+        people_sources.extend(record["leadership"] if isinstance(record["leadership"], list) else [])
+
+    for person in people_sources:
+        if not isinstance(person, dict):
+            continue
+        title_raw = (person.get("title") or person.get("job_title") or "").lower()
+        if not any(t in title_raw for t in TARGET_TITLES):
+            continue
+
+        started_on = person.get("started_on") or person.get("start_date") or person.get("appointment_date")
+        if not started_on:
+            continue
+
+        try:
+            start_date = datetime.strptime(str(started_on)[:10], "%Y-%m-%d")
+        except ValueError:
+            continue
+
+        days_since = (datetime.utcnow() - start_date).days
+        if start_date < cutoff:
+            continue
+
+        role_norm = "cto" if "cto" in title_raw or "chief tech" in title_raw else (
+            "vp_engineering" if "vp eng" in title_raw or "vp of eng" in title_raw else (
+                "cio" if "cio" in title_raw else (
+                    "chief_data_officer" if "cdo" in title_raw or "chief data" in title_raw else (
+                        "head_of_ai" if "head of ai" in title_raw or "vp ai" in title_raw else "other"
+                    )
+                )
+            )
+        )
+        changes.append({
+            "role": role_norm,
+            "person_name": person.get("name") or person.get("full_name"),
+            "appointment_date": str(started_on)[:10],
+            "days_since_appointment": days_since,
+            "source_url": person.get("linkedin_url") or person.get("cb_url"),
+            "source": "crunchbase_people",
+        })
+
+    return changes
+
+
 def normalize_record(raw: dict) -> dict:
     """Normalize a raw Crunchbase record into our standard format."""
     return {

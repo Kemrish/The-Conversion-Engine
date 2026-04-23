@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .crunchbase import lookup_by_name, lookup_by_domain, normalize_record, get_recent_funding
+from .crunchbase import lookup_by_name, lookup_by_domain, normalize_record, get_recent_funding, get_leadership_changes
 from .layoffs import get_layoffs_for_company
 from .job_posts import get_job_posts
 from .ai_maturity import score_from_job_data
@@ -74,6 +74,7 @@ async def enrich_prospect(
     data_sources.append(DataSourceChecked(
         source="crunchbase_odm",
         status="success" if cb_record else "no_data",
+        signal_confidence=0.90 if cb_record else 0.0,
         fetched_at=now,
     ))
 
@@ -84,6 +85,7 @@ async def enrich_prospect(
     data_sources.append(DataSourceChecked(
         source="crunchbase_funding",
         status="success" if recent_funding else "no_data",
+        signal_confidence=0.90 if recent_funding else 0.0,
         fetched_at=now,
     ))
 
@@ -92,8 +94,27 @@ async def enrich_prospect(
     data_sources.append(DataSourceChecked(
         source="layoffs_fyi",
         status="success" if layoff_events else "no_data",
+        signal_confidence=0.85 if layoff_events else 0.0,
         fetched_at=now,
     ))
+
+    # ── Step 3.5: Autonomous leadership-change detection ─────────────────────
+    # Detect CTO/VP Engineering appointments from Crunchbase People data
+    # without requiring the caller to pass additional_signals manually.
+    auto_leadership_changes = get_leadership_changes(cb_record, days=90) if cb_record else []
+    lc_detected = len(auto_leadership_changes) > 0
+    data_sources.append(DataSourceChecked(
+        source="crunchbase_people_leadership",
+        status="success" if lc_detected else "no_data",
+        signal_confidence=0.75 if lc_detected else 0.0,
+        fetched_at=now,
+    ))
+
+    # Merge auto-detected leadership change into additional_signals if not already provided
+    extra = additional_signals or {}
+    if lc_detected and not extra.get("leadership_change"):
+        best = auto_leadership_changes[0]
+        extra = {**extra, "leadership_change": best}
 
     # ── Step 4: Job posts ────────────────────────────────────────────────────
     job_data = await get_job_posts(
@@ -107,16 +128,17 @@ async def enrich_prospect(
     data_sources.append(DataSourceChecked(
         source="job_posts_builtin_wellfound",
         status="success" if total_eng > 0 else "no_data",
+        signal_confidence=0.70 if total_eng > 0 else 0.20,
         fetched_at=now,
     ))
 
     # ── Step 5: AI maturity scoring ──────────────────────────────────────────
-    maturity = score_from_job_data(job_data, additional_signals)
+    maturity = score_from_job_data(job_data, extra)
 
     # ── Step 6: Classify ICP segment (official priority order) ──────────────
     segment, segment_confidence, segment_reasoning = _classify_segment(
         firmographics, recent_funding, layoff_events, job_data,
-        maturity, additional_signals
+        maturity, extra
     )
 
     # ── Step 7: Build buying window signals ──────────────────────────────────
@@ -156,7 +178,6 @@ async def enrich_prospect(
         )
 
     leader_sig = LeadershipChangeSignal(detected=False, role="none")
-    extra = additional_signals or {}
     lc = extra.get("leadership_change")
     if lc and lc.get("days_since_appointment", 999) <= 90:
         role_map = {
