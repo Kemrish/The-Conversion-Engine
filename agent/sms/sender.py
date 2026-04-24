@@ -14,7 +14,7 @@ AT_USERNAME = os.environ.get("AT_USERNAME", "sandbox")
 AT_API_KEY = os.environ.get("AT_API_KEY", "")
 AT_SHORTCODE = os.environ.get("AT_SHORTCODE", "")
 
-LIVE_SMS_ENABLED = os.environ.get("LIVE_SMS_ENABLED", "false").lower() == "true"
+TENACIOUS_SMS_ENABLED = os.environ.get("TENACIOUS_SMS_ENABLED", "false").lower() == "true"
 STAFF_SINK_PHONE = os.environ.get("STAFF_SINK_PHONE", "+254700000000")
 
 # Character limit for a single SMS
@@ -70,7 +70,7 @@ def send_sms(
         message = message[:SMS_MAX_CHARS - 3] + "..."
 
     # Kill switch
-    actual_recipient = to_phone if LIVE_SMS_ENABLED else STAFF_SINK_PHONE
+    actual_recipient = to_phone if TENACIOUS_SMS_ENABLED else STAFF_SINK_PHONE
 
     _init_at()
     sms_service = africastalking.SMS
@@ -86,8 +86,8 @@ def send_sms(
         return {
             "success": success,
             "recipient": actual_recipient,
-            "live_sms": LIVE_SMS_ENABLED,
-            "sandbox_routed": not LIVE_SMS_ENABLED,
+            "live_sms": TENACIOUS_SMS_ENABLED,
+            "sandbox_routed": not TENACIOUS_SMS_ENABLED,
             "at_response": result,
             "sent_at": datetime.utcnow().isoformat(),
         }

@@ -53,7 +53,7 @@ async def health():
         "status": "ok",
         "timestamp": datetime.utcnow().isoformat(),
         "live_outbound_enabled": os.environ.get("TENACIOUS_OUTBOUND_ENABLED", "false"),
-        "live_sms_enabled": os.environ.get("LIVE_SMS_ENABLED", "false"),
+        "live_sms_enabled": os.environ.get("TENACIOUS_SMS_ENABLED", "false"),
     }
 
 

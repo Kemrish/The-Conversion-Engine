@@ -3,22 +3,44 @@ AI Maturity Scorer (0–3 integer).
 Derives a public-signal estimate of how seriously a prospect engages with AI.
 
 Score 0: No public signal of AI engagement.
+  → Silent-company path: returns rationale text explaining WHY 0 is correct
+    (private AI work, early stage, or deliberate AI-light posture). Composer
+    must NOT reference AI capability for score-0 prospects.
 Score 1: Some signal — mentions AI but no dedicated function.
 Score 2: Active signal — open roles, stack evidence, or executive commentary.
 Score 3: Strong signal — dedicated AI function, multiple high-weight inputs confirmed.
+
+Signal collectors (one per input parameter — all public sources only):
+  ai_adjacent_role_count   → job_posts.py  — counts AI/ML titles on public careers pages
+  has_ai_leadership        → crunchbase.py — checks People/founders for AI leadership titles
+  github_ai_signal         → (optional)    — public GitHub org for AI/ML repo activity
+  exec_ai_commentary       → additional_signals dict — caller-supplied from LinkedIn/press
+  modern_ml_stack          → additional_signals dict — caller-supplied from BuiltWith/Wappalyzer
+  strategic_ai_comms       → additional_signals dict — caller-supplied from annual reports
+
+Weighting (deterministic — no LLM involvement):
+  HIGH   (3 pts): ai_adjacent_role_count, has_ai_leadership
+  MEDIUM (2 pts): github_ai_signal, exec_ai_commentary
+  LOW    (1 pt):  modern_ml_stack, strategic_ai_comms
+
+Score thresholds:
+  total_weight >= 8 → score 3
+  total_weight >= 4 → score 2
+  total_weight >= 1 → score 1
+  total_weight == 0 → score 0 (silent-company path)
 """
 from __future__ import annotations
 from typing import Optional
 
-# Signal weights
-WEIGHT_HIGH = 3
-WEIGHT_MEDIUM = 2
-WEIGHT_LOW = 1
+# Signal weights — explicit constants used in all scoring logic below
+WEIGHT_HIGH = 3    # ai_adjacent_role_count, has_ai_leadership
+WEIGHT_MEDIUM = 2  # github_ai_signal, exec_ai_commentary
+WEIGHT_LOW = 1     # modern_ml_stack, strategic_ai_comms
 
-# Threshold for score levels
-SCORE_3_THRESHOLD = 8   # 3+ high-weight signals confirmed
-SCORE_2_THRESHOLD = 4   # 2+ medium signals or 1 high + 1 medium
-SCORE_1_THRESHOLD = 1   # Any signal present
+# Score thresholds — deterministic; no LLM involvement
+SCORE_3_THRESHOLD = 8   # requires at least two confirmed HIGH-weight signals
+SCORE_2_THRESHOLD = 4   # one HIGH + one MEDIUM, or two MEDIUMs
+SCORE_1_THRESHOLD = 1   # any single signal present
 
 
 def score_ai_maturity(

@@ -186,7 +186,13 @@ The Conversion Engine/
 │   ├── pricing_sheet.md         # Public pricing tiers
 │   ├── bench_summary.json       # Available engineer capacity
 │   └── email_sequences/         # Cold email templates
-├── probes/                      # Act III adversarial probes (Day 3–4)
+├── probes/
+│   ├── probe_catalog.json       # 30 structured probes (machine-readable, used by run_probes.py)
+│   ├── run_probes.py            # Probe runner — executes all check functions, exits 1 on failure
+│   └── probe_library.md        # Human-readable probe documentation with observed behavior
+├── agent/
+│   └── channels/
+│       └── __init__.py          # Multi-channel integration: Email + SMS + Calendar + CRM wired together
 ├── data/                        # Cached enrichment data
 ├── .env.example
 ├── docker-compose.yml
@@ -253,6 +259,47 @@ The evaluation harness in `eval/tau2_harness.py`:
 - Dev baseline: **38.7% pass@1** (95% CI: 29.8%–47.6%; reference: 42%)
 
 Do not run against the sealed 20-task held-out partition during development.
+
+---
+
+## Inheritor Handoff
+
+For any successor engineer taking over this system. Read this before touching anything.
+
+### Known Limitations
+
+| Area | Limitation | Impact |
+|------|-----------|--------|
+| Job post scraper | `compute_velocity()` does not track how many snapshots the ratio was computed from — a 2-point ratio can claim "doubled" | Probe P-008 partial; hedge velocity language manually |
+| Layoff date handling | Undated layoffs.fyi entries fall back to "recent months" — not excluded | Probe P-027 partial; old layoffs may appear in email |
+| Timezone NL parsing | `/book` endpoint requires explicit ISO `start_time` + `timezone`; natural-language time is not parsed | Prospects must be given slot options from `/slots`, not asked "when works for you?" |
+| Crunchbase ODM coverage | The ODM sample does not cover all sectors; `competitors_analyzed` may be sparse for niche sectors | `gap_quality_self_check.prospect_silent_but_sophisticated_risk=True` when <3 peers found — do not use competitor-comparison language in email |
+| AI maturity: deliberate abstainers | No mechanism to detect intentional low-AI companies (privacy-first, regulated) — they receive generic email, not a gap pitch | Monitor for "that's not a gap, it's a choice" objections |
+| Render free-tier cache | `data/job_posts/` and `data/briefs/` are ephemeral on Render free tier — lost on restart | First pipeline run after restart re-scrapes and re-enriches; budget API costs accordingly |
+| HubSpot `tenacious_*` properties | Must be created once via `setup_custom_properties()` — if skipped, enrichment updates silently fail with 404 | Run the setup command in Quick Start step 4 before any live pipeline run |
+
+### TODOs for Successor
+
+- [ ] Replace `compute_velocity()` with a true 60-day snapshot comparison (requires a scheduled scrape job)
+- [ ] Add `deliberate_ai_abstainer` boolean to enrichment pipeline (detect from company description keywords: "privacy-first", "offline-first", "no AI")
+- [ ] Add natural-language time parser for `/book` endpoint (e.g., using `dateparser` library)
+- [ ] Add persistent cache layer (Redis or S3) to survive Render restarts
+- [ ] Wire GitHub AI signal collector (currently caller-supplied via `additional_signals`; should be fetched from public GitHub API)
+- [ ] Add `data_points` count to `compute_velocity()` output so low-sample ratios can be flagged
+
+### Operational Traps
+
+**Trap 1 — HubSpot custom properties**: If you get `PROPERTY_DOESNT_EXIST` errors from HubSpot, you forgot to run `setup_custom_properties()`. Run it once; it is idempotent.
+
+**Trap 2 — Cal.com self-hosted first boot**: The Docker Compose stack takes ~90 seconds to fully initialise on first boot. The API will 500 until the database migration completes. Wait for `calcom_1 | ✓ Ready` in the logs.
+
+**Trap 3 — Kill switch default**: Both `TENACIOUS_OUTBOUND_ENABLED` and `TENACIOUS_SMS_ENABLED` default to `false`. If emails are being silently swallowed, check `.env` — the most common mistake is setting `TENACIOUS_OUTBOUND_ENABLED=True` (capital T, invalid) instead of `true`.
+
+**Trap 4 — Resend webhook events**: The `/webhooks/email` endpoint only receives events Resend is configured to send. `email.replied` is not in the default set — add it in the Resend dashboard or reply detection will not fire.
+
+**Trap 5 — Africa's Talking sandbox number format**: The AT sandbox requires E.164 format (`+254XXXXXXXXX`). Passing a local format (`07XXXXXXXX`) silently accepts the message but it is never delivered.
+
+**Trap 6 — Langfuse trace volume**: At 20 prospects/week × 5 pipeline steps, you will hit the Langfuse free tier (10K events/month) within ~3 weeks. Either upgrade or disable tracing by leaving `LANGFUSE_SECRET_KEY` unset.
 
 ---
 

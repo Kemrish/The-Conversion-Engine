@@ -16,11 +16,14 @@ from .enrichment.pipeline import enrich_prospect
 from .email.composer import compose_cold_email, tone_check
 from .email.sender import send_email
 from .email.reply_handler import classify_reply
+from .sms.sender import (
+    send_sms, compose_scheduling_sms, compose_confirmation_sms, TENACIOUS_SMS_ENABLED
+)
 from .policy import decide as policy_decide
 from .crm.hubspot import (
     create_or_update_contact, update_contact_enrichment,
     create_deal, log_email_sent, log_email_reply,
-    log_call_booked
+    log_call_booked, log_sms_sent
 )
 from .calendar.calcom import get_available_slots, create_booking, build_booking_brief
 from .models.prospect import ICPSegment
@@ -282,10 +285,35 @@ async def handle_email_reply(
             next_action=policy["action"],
         )
 
-    # If policy says book_call → fetch available slots immediately
+    # If policy says book_call → fetch slots and send SMS scheduling nudge if phone known
     if policy["action"] == "book_call":
         slots = get_available_slots(timezone="America/New_York")
         result["available_slots"] = slots[:3]
+
+        # ── SMS scheduling nudge (Channel 2) ────────────────────────────────
+        # Send a short SMS if we have a phone number for the contact.
+        # In production this comes from HubSpot; here we check result context.
+        prospect_phone = result.get("prospect_phone")
+        if prospect_phone and slots:
+            sms_body = compose_scheduling_sms(
+                first_name=result.get("prospect_first_name", "there"),
+                agent_name="Tenacious",
+                proposed_time=slots[0].get("formatted", slots[0].get("start", "")),
+                cal_link=slots[0].get("booking_url", ""),
+            )
+            sms_result = send_sms(
+                to_phone=prospect_phone,
+                message=sms_body,
+                timezone_str="America/New_York",
+            )
+            result["sms_scheduling_nudge"] = sms_result
+            if hubspot_contact_id and sms_result.get("success"):
+                log_sms_sent(
+                    contact_id=hubspot_contact_id,
+                    message=sms_body,
+                    phone=prospect_phone,
+                    channel="sms_scheduling_nudge",
+                )
 
     _trace(
         name="email_reply_handler",
@@ -330,6 +358,31 @@ async def book_discovery_call(
             meeting_time=booking.get("formatted_time", start_time),
             cal_link=booking.get("calendar_link", ""),
         )
+
+    # ── SMS confirmation (Channel 2) ─────────────────────────────────────────
+    # After a successful booking, send an SMS confirmation if the contact has a
+    # phone number. TENACIOUS_SMS_ENABLED gates live delivery; sandbox routes to
+    # STAFF_SINK_PHONE when false (same kill-switch pattern as email).
+    contact_phone = booking.get("attendee_phone")
+    if booking.get("success") and contact_phone:
+        sms_body = compose_confirmation_sms(
+            first_name=contact_name.split()[0],
+            meeting_time=booking.get("formatted_time", start_time),
+            calendar_link=booking.get("calendar_link", ""),
+        )
+        sms_result = send_sms(
+            to_phone=contact_phone,
+            message=sms_body,
+            timezone_str=timezone,
+        )
+        booking["sms_confirmation"] = sms_result
+        if hubspot_contact_id and sms_result.get("success"):
+            log_sms_sent(
+                contact_id=hubspot_contact_id,
+                message=sms_body,
+                phone=contact_phone,
+                channel="sms_booking_confirmation",
+            )
 
     _trace(
         name="discovery_call_booking",

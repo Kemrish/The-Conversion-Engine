@@ -1,7 +1,13 @@
 """
-Job post scraper using Playwright.
-Fetches public job listings from Wellfound, BuiltIn, and company careers pages.
-Respects robots.txt. No login. No captcha bypass.
+Job post scraper — public-page-only, robots.txt compliant.
+Fetches public job listings from Wellfound and company careers pages.
+
+Compliance constraints (enforced in code, not just policy):
+  - robots.txt is checked before scraping any careers URL; page is skipped if disallowed.
+  - User-Agent identifies TenaciousBot so operators can block if desired.
+  - No authentication, no captcha bypass, no headless rendering of JS-gated content.
+  - Only public /careers, /jobs, /about/careers paths are attempted.
+  - Playwright is NOT used by default; plain httpx keeps the scraper lightweight and auditable.
 """
 from __future__ import annotations
 import asyncio
@@ -10,6 +16,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
 import httpx
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "job_posts"
@@ -29,6 +37,26 @@ ENGINEERING_KEYWORDS = [
     "devops", "sre", "site reliability", "infrastructure engineer",
     "python developer", "go developer", "rust developer",
 ]
+
+
+BOT_UA = "TenaciousBot/1.0 (+https://tenacious.consulting/bot)"
+
+
+def _robots_allows(base_url: str, path: str) -> bool:
+    """
+    Fetch and parse robots.txt for the target domain.
+    Returns True only if TenaciousBot is permitted to fetch the given path.
+    Defaults to False on any fetch error (fail-closed).
+    """
+    parsed = urlparse(base_url)
+    robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+    rp = RobotFileParser()
+    rp.set_url(robots_url)
+    try:
+        rp.read()
+        return rp.can_fetch(BOT_UA, path)
+    except Exception:
+        return False  # fail-closed: treat unreachable robots.txt as disallowed
 
 
 def _is_ai_adjacent(title: str) -> bool:
@@ -77,13 +105,21 @@ async def scrape_careers_page(careers_url: str, company_name: str) -> list[dict]
     Light scrape of a company's public careers page.
     Extracts job titles from common HTML patterns without Playwright overhead.
     Only used as fallback; primary data comes from the frozen snapshot.
+
+    robots.txt is checked before fetching. The page is skipped if TenaciousBot
+    is disallowed — this is enforced in code, not just policy.
     """
+    # Robots.txt compliance check — skip if disallowed
+    parsed = urlparse(careers_url)
+    if not _robots_allows(f"{parsed.scheme}://{parsed.netloc}", parsed.path):
+        return []
+
     jobs = []
     try:
         async with httpx.AsyncClient(
             timeout=15.0,
             follow_redirects=True,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; TenaciousBot/1.0)"}
+            headers={"User-Agent": BOT_UA}
         ) as client:
             resp = await client.get(careers_url)
             if resp.status_code != 200:

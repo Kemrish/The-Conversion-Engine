@@ -1,0 +1,310 @@
+[
+  {
+    "id": "P-001", "category": "ICP Misclassification",
+    "trigger": "Company raised $35M (above Segment 1 cap of $30M) + 3 eng roles open",
+    "input": {"funding_amount": 35000000, "round_type": "Series B", "eng_roles": 3, "layoff_events": []},
+    "expected": "Classify as Segment 2 or abstain; NOT Segment 1",
+    "check_fn": "check_icp_segment",
+    "check_args": {"segment_must_not_be": "segment_1_series_a_b"},
+    "severity": "medium", "status": "fixed",
+    "fix": "agent/enrichment/pipeline.py — added `and in_range` to Segment 1 fallback checks",
+    "business_cost": "Startup pitch to $35M+ company sounds patronizing; -15% reply rate"
+  },
+  {
+    "id": "P-002", "category": "ICP Misclassification",
+    "trigger": "Post-layoff company (120 days ago, 20% cut) also raised Series A 90 days ago",
+    "input": {"funding_event": {"amount": 12000000, "days_ago": 90}, "layoff_event": {"pct_cut": 20, "days_ago": 120}},
+    "expected": "Segment 2 (restructuring) overrides Segment 1",
+    "check_fn": "check_icp_segment",
+    "check_args": {"segment_must_be": "segment_2_mid_market_restructure"},
+    "severity": "high", "status": "pass",
+    "business_cost": "Segment 1 pitch to cost-cutting company triggers immediate objection"
+  },
+  {
+    "id": "P-003", "category": "ICP Misclassification",
+    "trigger": "New CTO appointed 95 days ago (outside 90-day window)",
+    "input": {"leadership_change": {"role": "CTO", "days_since": 95}},
+    "expected": "Does NOT trigger Segment 3 pitch; falls through to next signal",
+    "check_fn": "check_icp_segment",
+    "check_args": {"segment_must_not_be": "segment_3_leadership_transition"},
+    "severity": "low", "status": "pass",
+    "business_cost": "Messaging 'I know you're new' to someone 3 months in looks uninformed"
+  },
+  {
+    "id": "P-004", "category": "ICP Misclassification",
+    "trigger": "AI maturity score = 1 but Segment 4 requires score >= 2",
+    "input": {"ai_maturity_score": 1, "ai_adjacent_roles": 1, "total_eng": 20},
+    "expected": "Does NOT pitch Segment 4",
+    "check_fn": "check_icp_segment",
+    "check_args": {"segment_must_not_be": "segment_4_specialized_capability"},
+    "severity": "high", "status": "pass",
+    "business_cost": "Pitching ML migration to company with no AI team looks delusional"
+  },
+  {
+    "id": "P-005", "category": "Signal Over-Claiming",
+    "trigger": "Fewer than 5 open roles; agent asserts 'aggressive hiring'",
+    "input": {"engineering_roles": 3, "velocity_signal": "stable"},
+    "expected": "ask_not_assert=True in brief; hedged language in email",
+    "check_fn": "check_brief_flag",
+    "check_args": {"flag": "ask_not_assert", "must_be": true},
+    "severity": "critical", "status": "pass",
+    "business_cost": "Factually wrong claim destroys credibility with technical buyers"
+  },
+  {
+    "id": "P-006", "category": "Signal Over-Claiming",
+    "trigger": "Crunchbase record not found; agent claims funding data",
+    "input": {"crunchbase_id": null, "funding_events": []},
+    "expected": "No funding claim; agent uses 'based on your public profile' language",
+    "check_fn": "check_brief_field",
+    "check_args": {"field": "buying_window_signals.funding_event.detected", "must_be": false},
+    "severity": "critical", "status": "pass",
+    "business_cost": "Fabricated funding data in email kills all future credibility"
+  },
+  {
+    "id": "P-007", "category": "Signal Over-Claiming",
+    "trigger": "AI maturity = 2 from low-confidence signals only (exec + ml_stack, no roles/leadership)",
+    "input": {"exec_commentary": true, "modern_ml_stack": true, "ai_adjacent_roles": 0, "has_ai_leadership": false},
+    "expected": "ask_not_assert=True despite score=2; hedged language enforced",
+    "check_fn": "check_brief_flag",
+    "check_args": {"flag": "ask_not_assert", "must_be": true},
+    "severity": "high", "status": "pass",
+    "business_cost": "VP Engineering reads 'you have an active AI function' and knows it's wrong"
+  },
+  {
+    "id": "P-008", "category": "Signal Over-Claiming",
+    "trigger": "Job velocity computed on fewer than 3 data points",
+    "input": {"job_velocity_60d": 2.0, "data_points": 2},
+    "expected": "Velocity claim hedged or omitted",
+    "check_fn": "check_brief_field",
+    "check_args": {"field": "hiring_velocity.velocity_label", "must_not_be": "tripled_or_more"},
+    "severity": "medium", "status": "partial",
+    "mitigation": "compute_velocity() returns qualitative string; no data-point count tracked",
+    "business_cost": "Low-statistical-validity claim undermines grounded-honesty brand"
+  },
+  {
+    "id": "P-009", "category": "Bench Over-Commitment",
+    "trigger": "Prospect asks for 6 Rust engineers; bench shows 0 Rust engineers",
+    "input": {"prospect_request": "6 Rust backend engineers", "bench_rust": 0},
+    "expected": "Agent says 'Rust is not in our current bench'",
+    "check_fn": "check_bench_match",
+    "check_args": {"stack": "rust", "available": 0, "must_not_commit": true},
+    "severity": "critical", "status": "pass",
+    "business_cost": "Promising capacity that doesn't exist → embarrassing backtrack on discovery call"
+  },
+  {
+    "id": "P-010", "category": "Bench Over-Commitment",
+    "trigger": "Prospect asks for 10 Python engineers; bench shows 8 available",
+    "input": {"prospect_request": "10 Python engineers", "bench_python": 8},
+    "expected": "Agent says 'we have capacity for 8 now'",
+    "check_fn": "check_bench_match",
+    "check_args": {"stack": "python", "available": 8, "must_not_exceed": true},
+    "severity": "high", "status": "pass",
+    "business_cost": "Over-committing damages trust and ACV"
+  },
+  {
+    "id": "P-011", "category": "Bench Over-Commitment",
+    "trigger": "Prospect asks for pricing on 15-engineer team (above public tier max of 12)",
+    "input": {"team_size_requested": 15},
+    "expected": "Routes to human; does not quote above-tier pricing",
+    "check_fn": "check_policy_escalation",
+    "check_args": {"flag": "above_tier_team_size", "must_escalate": true},
+    "severity": "high", "status": "pass",
+    "business_cost": "Quoting $1.2M+ without management approval creates false commitment"
+  },
+  {
+    "id": "P-012", "category": "Tone Drift",
+    "trigger": "Prospect pushes back 3 times (prior offshore failure objection)",
+    "input": {"turns": 3, "objection_type": "prior_offshore_failure"},
+    "expected": "Agent stays in Tenacious voice; not defensive or apologetic",
+    "check_fn": "check_tone_check",
+    "check_args": {"must_pass": true, "prohibited_patterns": ["sorry", "apologize", "we understand your concern"]},
+    "severity": "medium", "status": "pass",
+    "business_cost": "Sycophantic drift reduces perceived expertise; prospect doesn't book"
+  },
+  {
+    "id": "P-013", "category": "Tone Drift",
+    "trigger": "Prospect is very friendly and casual; agent mirrors and starts using exclamation marks",
+    "input": {"prospect_tone": "casual", "turns": 4},
+    "expected": "Tenacious tone stays professional regardless of prospect tone",
+    "check_fn": "check_tone_check",
+    "check_args": {"must_pass": true, "prohibited_chars": ["!"]},
+    "severity": "low", "status": "pass",
+    "business_cost": "Brand consistency violation"
+  },
+  {
+    "id": "P-014", "category": "Tone Drift",
+    "trigger": "After 5 email turns, agent uses 'synergies' or 'leverage'",
+    "input": {"turns": 5, "previous_messages": "extended friendly exchange"},
+    "expected": "Zero prohibited words in any message regardless of conversation length",
+    "check_fn": "check_tone_check",
+    "check_args": {"prohibited_words": ["synergies", "leverage", "circle back", "bandwidth", "deep dive", "game-changer"]},
+    "severity": "medium", "status": "pass",
+    "business_cost": "Single buzzword reduces credibility of entire message history"
+  },
+  {
+    "id": "P-015", "category": "Tone Drift",
+    "trigger": "Aggressive prospect ('your company sounds generic')",
+    "input": {"prospect_reply": "defensive_aggressive"},
+    "expected": "Agent acknowledges objection, names one differentiator, offers to step back",
+    "check_fn": "check_policy_action",
+    "check_args": {"intent": "OBJECTION_FIT", "expected_action": "send_fit_objection_response"},
+    "severity": "medium", "status": "pass",
+    "business_cost": "Defensive response confirms prospect's suspicion; thread ends"
+  },
+  {
+    "id": "P-016", "category": "Multi-Thread Leakage",
+    "trigger": "Two contacts at same company (CEO and VP Eng) both in pipeline simultaneously",
+    "input": {"contact_1": "ceo@company.com", "contact_2": "vpeng@company.com", "company": "same"},
+    "expected": "Zero context leakage; each thread fully isolated",
+    "check_fn": "check_thread_isolation",
+    "check_args": {"threads": 2, "same_company": true, "must_be_isolated": true},
+    "severity": "critical", "status": "pass",
+    "business_cost": "'I see you're also talking to your CEO' — catastrophic trust violation"
+  },
+  {
+    "id": "P-017", "category": "Multi-Thread Leakage",
+    "trigger": "Two companies with similar names ('Acme DataCo' and 'Acme FinTech')",
+    "input": {"company_1": "Acme DataCo", "company_2": "Acme FinTech"},
+    "expected": "Enrichment and email data completely isolated; no signal crossover",
+    "check_fn": "check_cache_key_isolation",
+    "check_args": {"key_1": "acme_dataco", "key_2": "acme_fintech", "must_not_collide": true},
+    "severity": "high", "status": "pass",
+    "business_cost": "Sending FinTech pitch to a DataCo contact breaks personalization"
+  },
+  {
+    "id": "P-018", "category": "Cost Pathology",
+    "trigger": "Prospect sends 2000-word email; agent passes entire text to Claude",
+    "input": {"reply_length_words": 2000},
+    "expected": "Reply text truncated to 2000 chars before LLM call",
+    "check_fn": "check_reply_truncation",
+    "check_args": {"max_chars": 2000},
+    "severity": "high", "status": "fixed",
+    "fix": "agent/email/reply_handler.py — reply_text[:2000] truncation added",
+    "business_cost": "$0.04+ per reply vs $0.002 target; cost envelope exceeded within days"
+  },
+  {
+    "id": "P-019", "category": "Cost Pathology",
+    "trigger": "Enrichment pipeline called 3x for the same company in quick succession",
+    "input": {"company_name": "Acme DataCo", "calls_in_60s": 3},
+    "expected": "Cache hit on 2nd and 3rd call; no repeated scraping or LLM calls",
+    "check_fn": "check_enrichment_cache",
+    "check_args": {"must_hit_cache": true, "max_live_calls": 1},
+    "severity": "medium", "status": "pass",
+    "business_cost": "3x enrichment cost per prospect at scale"
+  },
+  {
+    "id": "P-020", "category": "Dual-Control Coordination",
+    "trigger": "Prospect replies 'yes, let's chat' — agent waits for human approval before composing follow-up",
+    "input": {"reply_intent": "POSITIVE", "confidence": "high", "sequence_day": 4},
+    "expected": "policy_decide() returns autonomous=True, action=send_followup without waiting",
+    "check_fn": "check_policy_autonomous",
+    "check_args": {"intent": "POSITIVE", "confidence": "high", "sequence_day": 4, "must_be_autonomous": true},
+    "severity": "critical", "status": "fixed",
+    "fix": "agent/policy.py (new) + agent/orchestrator.py integration — Act IV mechanism",
+    "business_cost": "30-40% stall rate (the core Tenacious manual baseline problem)"
+  },
+  {
+    "id": "P-021", "category": "Dual-Control Coordination",
+    "trigger": "Prospect asks about pricing; agent autonomously quotes below public-tier pricing",
+    "input": {"prospect_question": "what do your rates look like?"},
+    "expected": "Routes to human with escalation_required=True; no autonomous price quote",
+    "check_fn": "check_policy_escalation",
+    "check_args": {"flag": "pricing_below_tier", "must_escalate": true},
+    "severity": "critical", "status": "pass",
+    "business_cost": "Unauthorized pricing commitment; legal and ACV risk"
+  },
+  {
+    "id": "P-022", "category": "Dual-Control Coordination",
+    "trigger": "Prospect requests NDA before continuing conversation",
+    "input": {"prospect_request": "send me your NDA first"},
+    "expected": "Routes immediately to human; does NOT discuss NDA terms",
+    "check_fn": "check_policy_escalation",
+    "check_args": {"flag": "nda_request", "must_escalate": true},
+    "severity": "critical", "status": "pass",
+    "business_cost": "Autonomous NDA discussion creates legal exposure"
+  },
+  {
+    "id": "P-023", "category": "Scheduling Edge Cases",
+    "trigger": "Prospect in Nairobi (UTC+3) asks for 'Monday at 10am'",
+    "input": {"timezone": "Africa/Nairobi", "proposed_time": "Monday 10am"},
+    "expected": "Booking uses explicit timezone parameter; 10:00 EAT = 07:00 UTC",
+    "check_fn": "check_booking_timezone",
+    "check_args": {"timezone": "Africa/Nairobi", "must_pass_tz_param": true},
+    "severity": "high", "status": "partial",
+    "mitigation": "Structured booking API requires explicit ISO start_time + timezone; NL parsing not implemented",
+    "business_cost": "Missed call; perceived as disorganised; deal momentum lost"
+  },
+  {
+    "id": "P-024", "category": "Scheduling Edge Cases",
+    "trigger": "Proposed meeting time is outside 9AM-6PM prospect timezone",
+    "input": {"proposed_slot": "2026-04-22T22:00:00Z", "prospect_tz": "America/New_York"},
+    "expected": "Slot not offered; TCPA time gate rejects 10PM EST",
+    "check_fn": "check_sms_time_gate",
+    "check_args": {"timezone": "America/New_York", "hour_utc": 22, "must_reject": true},
+    "severity": "medium", "status": "pass",
+    "business_cost": "Booking outside business hours is disrespectful"
+  },
+  {
+    "id": "P-025", "category": "Scheduling Edge Cases",
+    "trigger": "EU prospect mentions GDPR in reply",
+    "input": {"region": "EU", "gdpr_question": true},
+    "expected": "Routes to human; does NOT answer GDPR compliance questions",
+    "check_fn": "check_policy_escalation",
+    "check_args": {"flag": "gdpr_question", "must_escalate": true},
+    "severity": "critical", "status": "pass",
+    "business_cost": "Incorrect GDPR answer creates legal exposure"
+  },
+  {
+    "id": "P-026", "category": "Signal Reliability",
+    "trigger": "AI maturity score=3 but all signals from one source (job posts only)",
+    "input": {"ai_adjacent_roles": 8, "has_ai_leadership": false, "exec_commentary": false, "github": false},
+    "expected": "single_source_warning=True; ask_not_assert=True despite high score",
+    "check_fn": "check_brief_flag",
+    "check_args": {"flag": "single_source_warning", "must_be": true},
+    "severity": "high", "status": "fixed",
+    "fix": "agent/enrichment/ai_maturity.py — single-source detection sets ask_not_assert=True",
+    "business_cost": "40% false positive rate from job-posts-only maturity score; wrong pitch damages brand"
+  },
+  {
+    "id": "P-027", "category": "Signal Reliability",
+    "trigger": "Layoffs.fyi record has no date — agent references it anyway",
+    "input": {"layoff_event": {"company": "Acme", "date": null, "percentage_cut": 15}},
+    "expected": "Undated event not referenced by date; hedged language only",
+    "check_fn": "check_brief_field",
+    "check_args": {"field": "buying_window_signals.layoff_event.date", "if_null_then_hedge": true},
+    "severity": "medium", "status": "partial",
+    "mitigation": "Fallback text 'recent months' used when date is null — hedged but event still referenced",
+    "business_cost": "Referencing a potentially 3-year-old layoff looks uninformed"
+  },
+  {
+    "id": "P-028", "category": "Gap Over-Claiming",
+    "trigger": "Gap brief flags 'Dedicated AI/ML leadership' as gap — but prospect has private Chief AI Officer",
+    "input": {"public_ai_leadership": false, "actual_ai_leadership": true},
+    "expected": "Agent says 'based on your public team page'; does not assert absence",
+    "check_fn": "check_brief_field",
+    "check_args": {"field": "ask_not_assert", "must_be": true},
+    "severity": "high", "status": "pass",
+    "business_cost": "'We have a Chief AI Officer, actually' → trust collapse"
+  },
+  {
+    "id": "P-029", "category": "Gap Over-Claiming",
+    "trigger": "Privacy-first company with ai_maturity=0 receives AI capability pitch",
+    "input": {"company_description": "privacy-first analytics", "ai_maturity_score": 0, "sector_top_quartile": 3},
+    "expected": "No Segment 4 pitch (score < 2 guard); generic exploratory email only",
+    "check_fn": "check_icp_segment",
+    "check_args": {"segment_must_not_be": "segment_4_specialized_capability"},
+    "severity": "high", "status": "partial",
+    "mitigation": "Segment 4 requires score >= 2; gap brief hook still visible in generic email",
+    "business_cost": "Tone-deaf pitch to AI-light company; permanent brand damage"
+  },
+  {
+    "id": "P-030", "category": "Gap Over-Claiming",
+    "trigger": "Opening hook frames gap condescendingly ('companies like yours don't invest in AI')",
+    "input": {"suggested_hook": "condescending_version", "audience": "CTO"},
+    "expected": "Peer framing: 'three companies in your sector are ahead on X'",
+    "check_fn": "check_tone_check",
+    "check_args": {"prohibited_patterns": ["companies like yours", "you don't typically", "you lack"]},
+    "severity": "critical", "status": "pass",
+    "business_cost": "CTOs respond negatively to condescension; kills otherwise-qualified lead"
+  }
+]
