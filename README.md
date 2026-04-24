@@ -177,7 +177,9 @@ The Conversion Engine/
 │   ├── tau2_harness.py          # τ²-Bench evaluation harness
 │   ├── score_log.json           # All evaluation runs
 │   ├── trace_log.jsonl          # Full τ²-Bench trajectories
-│   └── baseline.md              # Baseline methodology and results
+│   ├── baseline.md              # Baseline methodology and results
+│   └── failure_taxonomy.md      # Aggregated failure metrics + business-cost arithmetic
+├── method.md                    # Mechanism design: 3 ablation variants + statistical test plan
 ├── seed/
 │   ├── icp_definition.md        # ICP segments and qualifying signals
 │   ├── style_guide.md           # Tenacious brand voice rules

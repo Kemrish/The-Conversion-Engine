@@ -334,66 +334,63 @@ def _assemble_competitor_brief(
             ai_maturity_justification=c.get("notable_practices", []),
             headcount_band=hband,
             top_quartile=c.get("ai_maturity_score", 0) >= 2,
-            sources_checked=[],
+            sources_checked=["crunchbase_odm"],
         ))
 
-    # Pad to minimum 5 competitors with placeholders if needed
-    while len(competitors) < 5:
-        competitors.append(CompetitorEntry(
-            name=f"Sector Peer {len(competitors)+1}",
-            domain="example.com",
-            ai_maturity_score=1,
-            ai_maturity_justification=["Inferred from sector baseline"],
-            headcount_band="80_to_200",
-            top_quartile=False,
-        ))
+    # Flag insufficient peer data rather than padding with synthetic placeholders.
+    # The email composer and caller must check gap_quality_self_check.insufficient_peer_data
+    # before including competitor comparison language in outreach.
+    insufficient_peer_data = len(competitors) < 3
 
     top_gaps_raw = gap_data.get("top_gaps", [])
     gap_findings = []
-    for g in top_gaps_raw[:3]:
-        peer_ev = []
-        for comp in competitors[:2]:
-            peer_ev.append(PeerEvidence(
-                competitor_name=comp.name,
-                evidence=g.get("evidence", "Public signal observed"),
-                source_url="https://linkedin.com/company/placeholder",
-            ))
-        gap_findings.append(GapFinding(
-            practice=g.get("practice", "Unknown practice"),
-            peer_evidence=peer_ev,
-            prospect_state="No public signal of this practice found",
-            confidence="low",
-            segment_relevance=[],
-        ))
 
-    if not gap_findings:
-        gap_findings.append(GapFinding(
-            practice="Dedicated AI/ML engineering function",
-            peer_evidence=[
+    if insufficient_peer_data:
+        # No fabricated gap findings when peer sample is too small to be meaningful.
+        # Return empty gap_findings so the composer falls back to generic capability framing.
+        pass
+    else:
+        for g in top_gaps_raw[:3]:
+            # Build peer evidence only from real scored competitors — no placeholder URLs.
+            real_top_q = [comp for comp in competitors if comp.top_quartile][:2]
+            if not real_top_q:
+                real_top_q = competitors[:2]
+            peer_ev = [
                 PeerEvidence(
-                    competitor_name="Sector Peer 1",
-                    evidence="Posted ML platform engineer roles in the last 60 days",
-                    source_url="https://linkedin.com/company/placeholder",
-                ),
-                PeerEvidence(
-                    competitor_name="Sector Peer 2",
-                    evidence="Engineering blog describes dedicated MLOps team",
-                    source_url="https://linkedin.com/company/placeholder",
-                ),
-            ],
-            prospect_state="No public signal of dedicated AI function",
-            confidence="low",
-        ))
+                    competitor_name=comp.name,
+                    evidence=g.get("evidence", "Public signal observed in Crunchbase sector data"),
+                    source_url=f"https://www.crunchbase.com/organization/{comp.name.lower().replace(' ', '-')}",
+                )
+                for comp in real_top_q
+            ]
+            gap_findings.append(GapFinding(
+                practice=g.get("practice", "Unknown practice"),
+                peer_evidence=peer_ev,
+                prospect_state="No public signal of this practice found",
+                confidence="low",
+                segment_relevance=[],
+            ))
 
     top_q_scores = sorted(
         [c.ai_maturity_score for c in competitors], reverse=True
-    )
+    ) if competitors else [0]
     top_q_bench = sum(top_q_scores[:max(1, len(top_q_scores)//4)]) / max(1, len(top_q_scores)//4)
 
+    has_real_source_urls = (
+        not insufficient_peer_data
+        and bool(gap_findings)
+        and all(
+            ev.source_url and "placeholder" not in ev.source_url
+            for gf in gap_findings for ev in gf.peer_evidence
+        )
+    )
+
     self_check = GapQualitySelfCheck(
-        all_peer_evidence_has_source_url=False,
+        all_peer_evidence_has_source_url=has_real_source_urls,
         at_least_one_gap_high_confidence=any(g.confidence == "high" for g in gap_findings),
-        prospect_silent_but_sophisticated_risk=False,
+        # Re-purpose this flag to signal insufficient peer data — caller must not use
+        # competitor-comparison language when True.
+        prospect_silent_but_sophisticated_risk=insufficient_peer_data,
     )
 
     return CompetitorGapBrief(
@@ -404,7 +401,7 @@ def _assemble_competitor_brief(
         sector_top_quartile_benchmark=top_q_bench,
         competitors_analyzed=competitors,
         gap_findings=gap_findings,
-        suggested_pitch_shift=gap_data.get("suggested_opening_hook"),
+        suggested_pitch_shift=None if insufficient_peer_data else gap_data.get("suggested_opening_hook"),
         gap_quality_self_check=self_check,
     )
 
