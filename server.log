@@ -1,0 +1,125 @@
+INFO:     Started server process [19216]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:58902 - "GET /health HTTP/1.1" 200 OK
+[orchestrator] Starting pipeline for Acme DataCo (jane@acmedataco.com)
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[orchestrator] Enrichment complete — AI maturity: 0/3
+[orchestrator] ICP segment: abstain (confidence: 0.00)
+[orchestrator] Email composed: 'Question: Acme DataCo engineering capacity'
+[orchestrator] HubSpot error: (401)
+Reason: Unauthorized
+HTTP response headers: HTTPHeaderDict({'Date': 'Sat, 25 Apr 2026 13:17:19 GMT', 'Content-Type': 'application/json;charset=utf-8', 'Content-Length': '142', 'Connection': 'keep-alive', 'CF-Ray': '9f1da094b80de5a6-OTP', 'CF-Cache-Status': 'DYNAMIC', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload', 'Vary': 'origin, Accept-Encoding', 'access-control-allow-credentials': 'false', 'server-timing': 'hcid;desc="019dc4c9-9952-7629-862a-ed8cfe0a80b8", cfr;desc="9f1da094d659e40e-IAD"', 'x-hubspot-auth-failure': '401 Unauthorized', 'x-hubspot-correlation-id': '019dc4c9-9952-7629-862a-ed8cfe0a80b8', 'Set-Cookie': '__cf_bm=5H5xRDcL4VIm3wzOpWe3IgE3UemzxRIhBq5rulW3dIw-1777123039-1.0.1.1-eWIzFEUZhF.3uWWVwYQfluyY92h9yduUCWJIhmSTOXosCJGfkJO7lspiXj1q5_92er6wY4uV9hFDLOOwjG9M0dkXs1k4.fVmFntGd9zqq4c; path=/; expires=Sat, 25-Apr-26 13:47:19 GMT; domain=.hubapi.com; HttpOnly; Secure; SameSite=None', 'Report-To': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=DVztj3ifMEkx0agVV0Wsci3Ycc3NZ0T%2FZU%2Fi8vaKLzmB%2FC0mbHOR4T3zE5mgUf3rgQyJx25fD4HLDgX%2FPLjnCu%2FLF2vCy2%2FWlYp7cMLETRKPnJAW70PAGzODfEmjyZrh"}],"group":"cf-nel","max_age":604800}', 'NEL': '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}', 'Server': 'cloudflare'})
+HTTP response body: {"status":"error","message":"Infra-idp validation failed with error: MALFORMED_TOKEN.","correlationId":"019dc4c9-9952-7629-862a-ed8cfe0a80b8"}
+
+INFO:     127.0.0.1:52470 - "POST /prospects/sync HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59673 - "POST /book HTTP/1.1" 422 Unprocessable Entity
+[calcom] Network error on attempt 1: [WinError 10061] No connection could be made because the target machine actively refused it
+[calcom] Network error on attempt 2: [WinError 10061] No connection could be made because the target machine actively refused it
+INFO:     127.0.0.1:59675 - "POST /book HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49690 - "POST /prospects/sync HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:49692 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49694 - "POST /prospects/sync HTTP/1.1" 422 Unprocessable Entity
+[orchestrator] Starting pipeline for TenA (kemer@TenA.com)
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[orchestrator] Enrichment complete — AI maturity: 0/3
+[orchestrator] ICP segment: abstain (confidence: 0.00)
+[orchestrator] Email composed: 'Question: what does TenA's engineering bench look like?'
+[orchestrator] HubSpot error: (401)
+Reason: Unauthorized
+HTTP response headers: HTTPHeaderDict({'Date': 'Sat, 25 Apr 2026 14:48:35 GMT', 'Content-Type': 'application/json;charset=utf-8', 'Content-Length': '142', 'Connection': 'keep-alive', 'CF-Ray': '9f1e26463821f00c-YYZ', 'CF-Cache-Status': 'DYNAMIC', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload', 'Vary': 'origin, Accept-Encoding', 'access-control-allow-credentials': 'false', 'server-timing': 'hcid;desc="019dc51d-27fd-7ca5-9786-d262a9a05ff0", cfr;desc="9f1e264643e7f00c-IAD"', 'x-hubspot-auth-failure': '401 Unauthorized', 'x-hubspot-correlation-id': '019dc51d-27fd-7ca5-9786-d262a9a05ff0', 'Set-Cookie': '__cf_bm=v3JSSGBEm8bx0PkfyTcCHZIEJZdgtaJKaolPttYTM0E-1777128515-1.0.1.1-iuHhoWs4EY80Bns6kUzqDT2LqcFtIoGKveUeX5JYFngRhFyRTJqySyRUuu1lkPa2heffw2OQe275RsBuDVSW5IkQhbgOTM5aKItKZ12NVxk; path=/; expires=Sat, 25-Apr-26 15:18:35 GMT; domain=.hubapi.com; HttpOnly; Secure; SameSite=None', 'Report-To': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=iNaZjx265Y%2FM4FVammmiZl0tfZ%2B9UIGp%2BnJczutul5GwlG2Ws1faAdqFyIZEDJ8plFE6XiLKPwfdNic3SkLw9M7jHSegg312G09qvhNRzfgs4VFskgmdn5o0VKy7W2fA"}],"group":"cf-nel","max_age":604800}', 'NEL': '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}', 'Server': 'cloudflare'})
+HTTP response body: {"status":"error","message":"Infra-idp validation failed with error: MALFORMED_TOKEN.","correlationId":"019dc51d-27fd-7ca5-9786-d262a9a05ff0"}
+
+INFO:     127.0.0.1:49698 - "POST /prospects/sync HTTP/1.1" 200 OK
+[orchestrator] Starting pipeline for TenA (kemer@TenA.com)
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[orchestrator] Enrichment complete — AI maturity: 0/3
+[orchestrator] ICP segment: abstain (confidence: 0.00)
+[orchestrator] Email composed: 'Question: what does TenA's engineering pipeline look like?'
+[orchestrator] HubSpot error: (401)
+Reason: Unauthorized
+HTTP response headers: HTTPHeaderDict({'Date': 'Sat, 25 Apr 2026 14:49:03 GMT', 'Content-Type': 'application/json;charset=utf-8', 'Content-Length': '142', 'Connection': 'keep-alive', 'CF-Ray': '9f1e26f2ae343972-YYZ', 'CF-Cache-Status': 'DYNAMIC', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload', 'Vary': 'origin, Accept-Encoding', 'access-control-allow-credentials': 'false', 'server-timing': 'hcid;desc="019dc51d-93c8-7ce8-8bc7-84a0089dce34", cfr;desc="9f1e26f2b7cc3972-IAD"', 'x-hubspot-auth-failure': '401 Unauthorized', 'x-hubspot-correlation-id': '019dc51d-93c8-7ce8-8bc7-84a0089dce34', 'Set-Cookie': '__cf_bm=JXIDrfF168rHmNNwwFuaEq2fdlFD2uf3IzZYcMdDgB8-1777128543-1.0.1.1-JmDHWfJndt99BbBC_MAX5jvjBrrEyrubtHUvZh0Yi95csntOfAo2PvuHJuIgLbqGxTn4tNeeEIJh18BviRm6ghkiXVl8lWu5YEOQO36x1So; path=/; expires=Sat, 25-Apr-26 15:19:03 GMT; domain=.hubapi.com; HttpOnly; Secure; SameSite=None', 'Report-To': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=WLAKRLA5Z08nBdE9FoupAdtDDQPnwqZu%2BGYJq9n7xL7OaatWcvbvFHE39Zrco2h%2Fgvw430K4v2MeqlOPVRuq6yZXZyTKXF%2FVVRdCSmf%2FELwEK0eiStt1PvRultG%2F9CXr"}],"group":"cf-nel","max_age":604800}', 'NEL': '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}', 'Server': 'cloudflare'})
+HTTP response body: {"status":"error","message":"Infra-idp validation failed with error: MALFORMED_TOKEN.","correlationId":"019dc51d-93c8-7ce8-8bc7-84a0089dce34"}
+
+INFO:     127.0.0.1:61563 - "POST /prospects/sync HTTP/1.1" 200 OK
+[orchestrator] Starting pipeline for Acme DataCo (jane@acmedataco.com)
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[orchestrator] Enrichment complete — AI maturity: 0/3
+[orchestrator] ICP segment: abstain (confidence: 0.00)
+[orchestrator] Email composed: 'Question: Acme DataCo's engineering capacity'
+[orchestrator] HubSpot error: (401)
+Reason: Unauthorized
+HTTP response headers: HTTPHeaderDict({'Date': 'Sat, 25 Apr 2026 14:58:01 GMT', 'Content-Type': 'application/json;charset=utf-8', 'Content-Length': '142', 'Connection': 'keep-alive', 'CF-Ray': '9f1e34192a10aeb6-YYZ', 'CF-Cache-Status': 'DYNAMIC', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload', 'Vary': 'origin, Accept-Encoding', 'access-control-allow-credentials': 'false', 'server-timing': 'hcid;desc="019dc525-cbd7-73ae-954a-c723125de184", cfr;desc="9f1e341934c5aeb6-YYZ"', 'x-hubspot-auth-failure': '401 Unauthorized', 'x-hubspot-correlation-id': '019dc525-cbd7-73ae-954a-c723125de184', 'Set-Cookie': '__cf_bm=eyS_Wit3Ogl6OqEvzBlOf9qBW34ozaX2xmv7Gbgq2hs-1777129081-1.0.1.1-d.H4HZf.ZcUYi0fHnpa4hypuORMD0t2SeDmU6UGyZ36Erl2Cv_5Ox760XsUbE1Xk.ESDKgTr1Nbxe2R4UV24L44.Z_JoMnDBttseQgTV0ds; path=/; expires=Sat, 25-Apr-26 15:28:01 GMT; domain=.hubapi.com; HttpOnly; Secure; SameSite=None', 'Report-To': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=Qky%2FPOEhpt%2FiOFwzla7VVvbvUgRBPCfGDm%2B9%2FsPYakx3epD6IaEhmudK4t1%2Fgad%2BoSnLrCie23eYoaablgD1602gns3NES40wNS0ISQzqV8R8paq8WHhQeqshK%2BGl5Tk"}],"group":"cf-nel","max_age":604800}', 'NEL': '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}', 'Server': 'cloudflare'})
+HTTP response body: {"status":"error","message":"Infra-idp validation failed with error: MALFORMED_TOKEN.","correlationId":"019dc525-cbd7-73ae-954a-c723125de184"}
+
+INFO:     127.0.0.1:52864 - "POST /prospects/sync HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60455 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56411 - "POST /webhooks/email HTTP/1.1" 422 Unprocessable Entity
+[calcom] Network error on attempt 1: [WinError 10061] No connection could be made because the target machine actively refused it
+[calcom] Network error on attempt 2: [WinError 10061] No connection could be made because the target machine actively refused it
+INFO:     127.0.0.1:56413 - "POST /book HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58532 - "POST /webhooks/email HTTP/1.1" 200 OK
+[calcom] Network error on attempt 1: [WinError 10061] No connection could be made because the target machine actively refused it
+[calcom] Network error on attempt 2: [WinError 10061] No connection could be made because the target machine actively refused it
+[calcom] Failed to fetch slots: [WinError 10061] No connection could be made because the target machine actively refused it
+[orchestrator] Starting pipeline for Acme DataCo (jane@acmedataco.com)
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[orchestrator] Enrichment complete — AI maturity: 0/3
+[orchestrator] ICP segment: abstain (confidence: 0.00)
+[orchestrator] Email composed: 'Question: Acme DataCo engineering capacity'
+[orchestrator] HubSpot error: (401)
+Reason: Unauthorized
+HTTP response headers: HTTPHeaderDict({'Date': 'Sat, 25 Apr 2026 15:08:48 GMT', 'Content-Type': 'application/json;charset=utf-8', 'Content-Length': '142', 'Connection': 'keep-alive', 'CF-Ray': '9f1e43e4ead439f7-YYZ', 'CF-Cache-Status': 'DYNAMIC', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload', 'Vary': 'origin, Accept-Encoding', 'access-control-allow-credentials': 'false', 'server-timing': 'hcid;desc="019dc52f-ab38-7919-bff5-ab28361c2878", cfr;desc="9f1e43e505a139f7-IAD"', 'x-hubspot-auth-failure': '401 Unauthorized', 'x-hubspot-correlation-id': '019dc52f-ab38-7919-bff5-ab28361c2878', 'Set-Cookie': '__cf_bm=4HJo5pYD5hNrhBeh0zxhHZ6dd_WdodSNhBZF7yYrJB8-1777129728-1.0.1.1-YYVtlbL4.VKU9P6iDv1JCasgVwkm79WFbWVXMO1xfKAB5W7cPQ465ZT9TvaXjeZh5OfemaDAChZrKsot9WJT5dWIq8EwyzRIFfPyj1ek_zo; path=/; expires=Sat, 25-Apr-26 15:38:48 GMT; domain=.hubapi.com; HttpOnly; Secure; SameSite=None', 'Report-To': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=UNUVwleRJIJh7m1TraPZta06c46RQSAyq1uw0wgcRgVtJtX8wTQg7zk9cO6ISguw50bC8thlV2MYRGKP4U9pq2GsooQPU7K0mz9GKo9BVjZurBtLV3N0Wz%2BjZm4YZATW"}],"group":"cf-nel","max_age":604800}', 'NEL': '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}', 'Server': 'cloudflare'})
+HTTP response body: {"status":"error","message":"Infra-idp validation failed with error: MALFORMED_TOKEN.","correlationId":"019dc52f-ab38-7919-bff5-ab28361c2878"}
+
+INFO:     127.0.0.1:50134 - "POST /prospects/sync HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50152 - "POST /webhooks/email HTTP/1.1" 200 OK
+[calcom] Network error on attempt 1: [WinError 10061] No connection could be made because the target machine actively refused it
+[calcom] Network error on attempt 2: [WinError 10061] No connection could be made because the target machine actively refused it
+[calcom] Failed to fetch slots: [WinError 10061] No connection could be made because the target machine actively refused it
+[calcom] Network error on attempt 1: [WinError 10061] No connection could be made because the target machine actively refused it
+[calcom] Network error on attempt 2: [WinError 10061] No connection could be made because the target machine actively refused it
+INFO:     127.0.0.1:55958 - "POST /book HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65397 - "GET /health HTTP/1.1" 200 OK
+[orchestrator] Starting pipeline for Acme DataCo (jane@acmedataco.com)
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[crunchbase] Failed to download sample: Client error '404 Not Found' for url 'https://raw.githubusercontent.com/luminati-io/Crunchbase-dataset-samples/main/crunchbase_companies_dataset_sample.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+[orchestrator] Enrichment complete — AI maturity: 0/3
+[orchestrator] ICP segment: abstain (confidence: 0.00)
+[orchestrator] Email composed: 'Question: Acme DataCo's engineering capacity'
+[orchestrator] HubSpot error: (401)
+Reason: Unauthorized
+HTTP response headers: HTTPHeaderDict({'Date': 'Sat, 25 Apr 2026 15:31:24 GMT', 'Content-Type': 'application/json;charset=utf-8', 'Content-Length': '142', 'Connection': 'keep-alive', 'CF-Ray': '9f1e64fe4ddea641-YYZ', 'CF-Cache-Status': 'DYNAMIC', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload', 'Vary': 'origin, Accept-Encoding', 'access-control-allow-credentials': 'false', 'server-timing': 'hcid;desc="019dc544-5b0f-7259-9444-7b7a145095d6", cfr;desc="9f1e64fe561fa641-IAD"', 'x-hubspot-auth-failure': '401 Unauthorized', 'x-hubspot-correlation-id': '019dc544-5b0f-7259-9444-7b7a145095d6', 'Set-Cookie': '__cf_bm=SsulzVGPwTnkJRFndrR5kUFpj8ZTIaF.M3Tctr8hg5Y-1777131084-1.0.1.1-XCjlje06s5Qid5RkrixhW6sNwkXdCvBBfKRJarh82gRs8VQb4oPkIYKlbYJlH0f_rTrZw4zpUtkfW2LYKGHpQLRpzOp8V.WzBkWGXO1sUGs; path=/; expires=Sat, 25-Apr-26 16:01:24 GMT; domain=.hubapi.com; HttpOnly; Secure; SameSite=None', 'Report-To': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=NnSGl71wwJXF%2B%2FhLh6sJzTqG9TDvRXmpjyMYaFcH7oczHMjs2k5D76u60jpOhWHSp41tNCnjRG%2B39zmkkEvzGIl%2F%2F5WvSFDLrhP8v4mjQNibbmGFs8ro3SmXveq%2FZWV7"}],"group":"cf-nel","max_age":604800}', 'NEL': '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}', 'Server': 'cloudflare'})
+HTTP response body: {"status":"error","message":"Infra-idp validation failed with error: MALFORMED_TOKEN.","correlationId":"019dc544-5b0f-7259-9444-7b7a145095d6"}
+
+INFO:     127.0.0.1:58173 - "POST /prospects/sync HTTP/1.1" 200 OK

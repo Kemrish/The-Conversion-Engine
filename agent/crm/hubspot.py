@@ -71,7 +71,6 @@ def create_or_update_contact(
         "lastname": last_name,
         "company": company,
         "jobtitle": title,
-        "tenacious_status": "draft",
     }
     if phone:
         props["phone"] = phone
@@ -111,7 +110,6 @@ def update_contact_enrichment(
         "tenacious_ai_maturity_score": str(ai_maturity_score),
         "tenacious_hiring_signal_summary": hiring_signal_summary[:500],
         "tenacious_last_enriched_at": enriched_at,
-        "tenacious_status": "draft",
     }
     if crunchbase_id:
         props["tenacious_crunchbase_id"] = crunchbase_id
@@ -261,22 +259,26 @@ def log_call_booked(
 
 def _create_note(contact_id: str, body: str) -> dict:
     """Create a CRM note associated with a contact."""
-    client = _get_client()
+    import requests as _requests
+    token = HUBSPOT_ACCESS_TOKEN
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
-        note_input = {
-            "properties": {
+        resp = _requests.post(
+            "https://api.hubapi.com/crm/v3/objects/notes",
+            headers=headers,
+            json={"properties": {
                 "hs_note_body": body,
                 "hs_timestamp": str(int(datetime.utcnow().timestamp() * 1000)),
-            }
-        }
-        note = client.crm.objects.notes.basic_api.create(note_input)
-        # Associate note with contact
-        client.crm.objects.notes.associations_api.create(
-            note.id, "contacts", contact_id,
-            [{"associationCategory": "HUBSPOT_DEFINED", "associationTypeId": 202}]
+            }},
         )
-        return {"success": True, "note_id": note.id}
-    except ApiException as e:
+        resp.raise_for_status()
+        note_id = resp.json()["id"]
+        _requests.put(
+            f"https://api.hubapi.com/crm/v3/objects/notes/{note_id}/associations/contacts/{contact_id}/note_to_contact",
+            headers=headers,
+        )
+        return {"success": True, "note_id": note_id}
+    except Exception as e:
         return {"success": False, "error": str(e)}
 
 
@@ -289,12 +291,12 @@ def setup_custom_properties() -> dict:
     """
     client = _get_client()
     custom_props = [
-        {"name": "tenacious_icp_segment", "label": "Tenacious ICP Segment", "type": "string", "fieldType": "text"},
-        {"name": "tenacious_icp_confidence", "label": "Tenacious ICP Confidence", "type": "string", "fieldType": "text"},
-        {"name": "tenacious_ai_maturity_score", "label": "Tenacious AI Maturity Score", "type": "string", "fieldType": "text"},
-        {"name": "tenacious_hiring_signal_summary", "label": "Tenacious Hiring Signal Summary", "type": "string", "fieldType": "textarea"},
-        {"name": "tenacious_last_enriched_at", "label": "Tenacious Last Enriched At", "type": "string", "fieldType": "text"},
-        {"name": "tenacious_crunchbase_id", "label": "Tenacious Crunchbase ID", "type": "string", "fieldType": "text"},
+        {"name": "tenacious_icp_segment", "label": "Tenacious ICP Segment", "type": "string", "fieldType": "text", "groupName": "contactinformation"},
+        {"name": "tenacious_icp_confidence", "label": "Tenacious ICP Confidence", "type": "string", "fieldType": "text", "groupName": "contactinformation"},
+        {"name": "tenacious_ai_maturity_score", "label": "Tenacious AI Maturity Score", "type": "string", "fieldType": "text", "groupName": "contactinformation"},
+        {"name": "tenacious_hiring_signal_summary", "label": "Tenacious Hiring Signal Summary", "type": "string", "fieldType": "textarea", "groupName": "contactinformation"},
+        {"name": "tenacious_last_enriched_at", "label": "Tenacious Last Enriched At", "type": "string", "fieldType": "text", "groupName": "contactinformation"},
+        {"name": "tenacious_crunchbase_id", "label": "Tenacious Crunchbase ID", "type": "string", "fieldType": "text", "groupName": "contactinformation"},
     ]
     results = []
     for prop in custom_props:

@@ -1,5 +1,7 @@
 .env
 SUBMISSION_REPORT.md
+DEMO_SCRIPT.md
+DECISION_MEMO.md
 __pycache__/
 *.pyc
 *.pyo
