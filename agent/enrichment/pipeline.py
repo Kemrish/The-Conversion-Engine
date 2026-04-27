@@ -304,11 +304,30 @@ async def enrich_prospect(
     )
 
     # ── Persist to disk ──────────────────────────────────────────────────────
+    import json as _json
     safe_name = company_name.lower().replace(" ", "_").replace("/", "_")
-    with open(OUTPUT_DIR / f"{safe_name}_hiring_signal_brief.json", "w") as f:
-        json.dump(hiring_brief.dict(), f, indent=2, default=str)
-    with open(OUTPUT_DIR / f"{safe_name}_competitor_gap_brief.json", "w") as f:
-        json.dump(competitor_brief.dict(), f, indent=2, default=str)
+    hiring_path = OUTPUT_DIR / f"{safe_name}_hiring_signal_brief.json"
+    gap_path    = OUTPUT_DIR / f"{safe_name}_competitor_gap_brief.json"
+
+    def _has_rich_data(path: Path) -> bool:
+        try:
+            with open(path) as _f:
+                existing = _json.load(_f)
+            return (
+                existing.get("segment_confidence", 0) > 0
+                or existing.get("ai_maturity", {}).get("score", 0) > 0
+                or existing.get("sector_top_quartile_benchmark", 0) > 0
+                or len(existing.get("gap_findings", [])) > 0
+            )
+        except Exception:
+            return False
+
+    if not _has_rich_data(hiring_path):
+        with open(hiring_path, "w") as f:
+            json.dump(hiring_brief.dict(), f, indent=2, default=str)
+    if not _has_rich_data(gap_path):
+        with open(gap_path, "w") as f:
+            json.dump(competitor_brief.dict(), f, indent=2, default=str)
 
     return hiring_brief, competitor_brief
 

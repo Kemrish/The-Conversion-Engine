@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .orchestrator import (
@@ -38,6 +40,40 @@ app = FastAPI(
     description="Automated lead generation and conversion for Tenacious Consulting and Outsourcing",
     version="1.0.0",
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+_BRIEFS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "briefs")
+
+@app.get("/briefs/{domain}")
+async def get_briefs(domain: str):
+    """Return hiring signal brief and competitor gap brief for a domain."""
+    result = {}
+    if not os.path.isdir(_BRIEFS_DIR):
+        return JSONResponse(status_code=404, content={"error": "Briefs directory not found"})
+    for fname in os.listdir(_BRIEFS_DIR):
+        if not fname.endswith(".json"):
+            continue
+        fpath = os.path.join(_BRIEFS_DIR, fname)
+        try:
+            with open(fpath) as f:
+                data = json.load(f)
+        except Exception:
+            continue
+        if data.get("prospect_domain", "").lower() != domain.lower():
+            continue
+        if "hiring_signal_brief" in fname or "hiring_signal" in data:
+            result["hiring_signal_brief"] = data
+        elif "competitor_gap_brief" in fname or "gap_findings" in data:
+            result["competitor_gap_brief"] = data
+    if not result:
+        return JSONResponse(status_code=404, content={"error": f"No briefs found for domain '{domain}'"})
+    return result
 
 
 @app.on_event("startup")

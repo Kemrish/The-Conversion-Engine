@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Conversion Engine — Tenacious Consulting</title>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161a22;
+    --surface2: #1e2330;
+    --border: #252c3a;
+    --accent: #4f8ef7;
+    --accent2: #7c5cfc;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── Top bar ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.3px;
+  }
+  .logo-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .health-pill {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color .2s;
+  }
+  .health-pill:hover { border-color: var(--accent); }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  .dot.offline { background: var(--red); }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 0;
+    height: calc(100vh - 56px);
+  }
+  .sidebar {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .main {
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .card-header .icon { font-size: 15px; }
+  .card-body { padding: 16px; }
+
+  /* ── Form elements ── */
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 500; }
+  input, select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    width: 100%;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) { opacity: .9; }
+  .btn-secondary {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--accent); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; width: auto; }
+  .btn-group { display: flex; gap: 8px; }
+
+  /* ── Kill switch toggle ── */
+  .kill-switch {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .kill-label { font-size: 12px; font-weight: 600; }
+  .kill-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .toggle {
+    position: relative; width: 36px; height: 20px;
+    background: var(--red); border-radius: 10px;
+    transition: background .2s; cursor: default;
+  }
+  .toggle.on { background: var(--green); }
+  .toggle::after {
+    content: '';
+    position: absolute; top: 3px; left: 3px;
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    transition: transform .2s;
+  }
+  .toggle.on::after { transform: translateX(16px); }
+
+  /* ── Pipeline steps ── */
+  .steps { display: flex; flex-direction: column; gap: 8px; }
+  .step {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color .3s;
+  }
+  .step.ok { border-color: #22c55e33; }
+  .step.error { border-color: #ef444433; }
+  .step.running { border-color: var(--accent); }
+  .step-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+  .step.ok .step-icon { background: #22c55e22; }
+  .step.error .step-icon { background: #ef444422; }
+  .step.running .step-icon { background: #4f8ef722; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .step-info { flex: 1; min-width: 0; }
+  .step-name { font-size: 12px; font-weight: 600; }
+  .step-detail { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .step-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 7px;
+    border-radius: 4px; flex-shrink: 0;
+  }
+  .badge-ok { background: #22c55e22; color: var(--green); }
+  .badge-error { background: #ef444422; color: var(--red); }
+  .badge-pending { background: var(--border); color: var(--muted); }
+  .badge-running { background: #4f8ef722; color: var(--accent); }
+
+  /* ── Result card ── */
+  .result-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .meta-item {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .meta-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .meta-value { font-size: 14px; font-weight: 700; }
+  .meta-value.green { color: var(--green); }
+  .meta-value.yellow { color: var(--yellow); }
+  .meta-value.muted { color: var(--muted); }
+
+  /* ── Email preview ── */
+  .email-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px;
+    font-size: 12px; line-height: 1.6;
+  }
+  .email-subject { font-weight: 700; margin-bottom: 8px; font-size: 13px; }
+  .email-body { color: var(--muted); white-space: pre-wrap; }
+
+  /* ── Log ── */
+  .log {
+    background: #0a0c10;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    max-height: 200px;
+    overflow-y: auto;
+    color: #7dd3fc;
+  }
+  .log .log-ts { color: var(--muted); }
+  .log .log-ok { color: var(--green); }
+  .log .log-err { color: var(--red); }
+  .log .log-info { color: #7dd3fc; }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .8px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  /* ── Trace pill ── */
+  .trace-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px;
+    font-family: monospace; font-size: 11px; color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .trace-pill span { color: var(--accent); }
+
+  /* ── Quick actions ── */
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .quick-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 12px;
+    cursor: pointer; transition: border-color .2s, background .2s;
+    text-align: left;
+  }
+  .quick-btn:hover { border-color: var(--accent); background: #4f8ef708; }
+  .quick-btn .q-icon { font-size: 20px; margin-bottom: 6px; }
+  .quick-btn .q-title { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
+  .quick-btn .q-sub { font-size: 11px; color: var(--muted); }
+
+  /* ── Empty state ── */
+  .empty {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-text { font-size: 13px; }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+
+  /* ── Flow nodes ── */
+  .flow-node {
+    flex: 1; min-width: 110px; text-align: center;
+    padding: 12px 8px; border-radius: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    transition: border-color .3s, background .3s;
+  }
+  .flow-node.active { border-color: var(--accent); background: #4f8ef710; }
+  .flow-node.done { border-color: #22c55e44; background: #22c55e08; }
+  .flow-icon { font-size: 20px; margin-bottom: 4px; }
+  .flow-label { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+  .flow-sub { font-size: 10px; color: var(--muted); }
+  .flow-arrow { color: var(--muted); font-size: 18px; padding: 0 6px; align-self: center; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+  .tab {
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid transparent; color: var(--muted);
+    transition: all .15s;
+  }
+  .tab.active { background: var(--surface2); border-color: var(--border); color: var(--text); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* ── Signal grid ── */
+  .signal-grid { display: flex; flex-direction: column; gap: 6px; }
+  .signal-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 12px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .signal-row.found { border-color: #22c55e22; }
+  .signal-row.missing { border-color: #ef444422; }
+  .sig-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .sig-name { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+  .sig-status { font-size: 11px; color: var(--muted); }
+  .sig-badges { display: flex; gap: 5px; margin-top: 4px; }
+  .sig-badge {
+    font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600;
+  }
+  .w-high { background: #ef444422; color: var(--red); }
+  .w-medium { background: #f59e0b22; color: var(--yellow); }
+  .w-low { background: #22c55e22; color: var(--green); }
+  .c-high { background: #22c55e22; color: var(--green); }
+  .c-medium { background: #f59e0b22; color: var(--yellow); }
+  .c-low { background: var(--border); color: var(--muted); }
+
+  /* ── Gap findings ── */
+  .gap-item {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; margin-bottom: 8px;
+  }
+  .gap-item.high { border-color: #ef444433; }
+  .gap-practice { font-size: 13px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .gap-prospect { font-size: 11px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
+  .peer-evidence { display: flex; flex-direction: column; gap: 4px; }
+  .peer-row { font-size: 11px; display: flex; gap: 6px; }
+  .peer-name { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+  .peer-ev { color: var(--muted); }
+
+  /* ── Velocity bar ── */
+  .vel-bar-wrap { background: var(--border); border-radius: 4px; height: 6px; margin: 6px 0; }
+  .vel-bar { height: 6px; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    The Conversion Engine
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="health-pill" onclick="checkHealth()" title="Click to refresh">
+      <div class="dot" id="health-dot"></div>
+      <span id="health-text">Checking…</span>
+    </div>
+    <div class="kill-switch" style="border-radius:20px;padding:5px 12px 5px 10px;">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--muted)">Kill switch</span>
+        <div class="toggle on" id="kill-toggle" title="Outbound disabled in safe mode"></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ── LEFT SIDEBAR: Pipeline trigger form ── -->
+  <div class="sidebar">
+
+    <div>
+      <div class="section-label">Prospect</div>
+      <div class="card">
+        <div class="card-header"><span class="icon">👤</span> Trigger Pipeline</div>
+        <div class="card-body">
+          <div class="row">
+            <div class="field">
+              <label>First Name</label>
+              <input id="f-first" type="text" placeholder="Jane" value="Jane" />
+            </div>
+            <div class="field">
+              <label>Last Name</label>
+              <input id="f-last" type="text" placeholder="Smith" value="Smith" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input id="f-email" type="email" placeholder="jane@acmedataco.com" value="jane@acmedataco.com" />
+          </div>
+          <div class="field">
+            <label>Title</label>
+            <input id="f-title" type="text" placeholder="VP Engineering" value="VP Engineering" />
+          </div>
+          <div class="field">
+            <label>Company</label>
+            <input id="f-company" type="text" placeholder="Acme DataCo" value="Acme DataCo" />
+          </div>
+          <div class="field">
+            <label>Domain</label>
+            <input id="f-domain" type="text" placeholder="acmedataco.com" value="acmedataco.com" />
+          </div>
+          <button class="btn btn-primary" id="run-btn" onclick="runPipeline()">
+            <span id="run-icon">▶</span>
+            <span id="run-label">Run Pipeline</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Actions</div>
+      <div class="quick-grid">
+        <div class="quick-btn" onclick="simulateReply()" style="grid-column:span 2">
+          <div class="q-icon">💬</div>
+          <div class="q-title">Simulate Prospect Reply</div>
+          <div class="q-sub">Fires reply webhook → policy classifies → books call automatically</div>
+        </div>
+        <div class="quick-btn" onclick="checkHealth()">
+          <div class="q-icon">🩺</div>
+          <div class="q-title">Health Check</div>
+          <div class="q-sub">GET /health</div>
+        </div>
+        <div class="quick-btn" onclick="getSlots()">
+          <div class="q-icon">🕐</div>
+          <div class="q-title">View Slots</div>
+          <div class="q-sub">Admin — see availability</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Activity Log</div>
+      <div class="log" id="log">
+        <div><span class="log-ts">[ready] </span><span class="log-info">Dashboard loaded. API at http://localhost:8000</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── MAIN PANEL ── -->
+  <div class="main">
+
+    <!-- Pipeline steps -->
+    <div>
+      <div class="section-label">Pipeline Steps</div>
+      <div class="steps" id="steps">
+        <div class="step" id="step-enrichment">
+          <div class="step-icon">🔍</div>
+          <div class="step-info">
+            <div class="step-name">Signal Enrichment</div>
+            <div class="step-detail">Crunchbase · Wellfound · BuiltWith · LinkedIn</div>
+          </div>
+          <span class="step-badge badge-pending">IDLE</span>
+        </div>
+        <div class="step" id="step-icp_classification">
+          <div class="step-icon">🎯</div>
+          <div class="step-info">
+            <div class="step-name">ICP Classifier</div>
+            <div class="step-detail">Segment · Confidence threshold ≥ 65%</div>
+          </div>
+          <span class="step-badge badge-pending">IDLE</span>
+        </div>
+        <div class="step" id="step-email_composition">
+          <div class="step-icon">✍️</div>
+          <div class="step-info">
+            <div class="step-name">Email Composer</div>
+            <div class="step-detail">Signal-grounded · Tone check · Honesty flags</div>
+          </div>
+          <span class="step-badge badge-pending">IDLE</span>
+        </div>
+        <div class="step" id="step-hubspot_contact">
+          <div class="step-icon">🗂️</div>
+          <div class="step-info">
+            <div class="step-name">HubSpot CRM</div>
+            <div class="step-detail">Upsert contact · Write enrichment data</div>
+          </div>
+          <span class="step-badge badge-pending">IDLE</span>
+        </div>
+        <div class="step" id="step-email_send">
+          <div class="step-icon">📤</div>
+          <div class="step-info">
+            <div class="step-name">Email Send</div>
+            <div class="step-detail">Resend · Kill switch routes to staff sink</div>
+          </div>
+          <span class="step-badge badge-pending">IDLE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result panel -->
+    <div id="result-panel" style="display:none">
+      <div class="section-label">Run Result</div>
+      <div class="card">
+        <div class="card-body">
+          <div class="trace-pill">
+            🔗 Trace ID: <span id="res-trace">—</span>
+            <span style="margin-left:auto;color:var(--muted)" id="res-duration">—</span>
+          </div>
+          <div class="result-meta">
+            <div class="meta-item">
+              <div class="meta-label">ICP Segment</div>
+              <div class="meta-value" id="res-segment">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Confidence</div>
+              <div class="meta-value" id="res-confidence">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">AI Maturity Score</div>
+              <div class="meta-value" id="res-maturity">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">HubSpot Contact</div>
+              <div class="meta-value" id="res-hubspot">—</div>
+            </div>
+          </div>
+          <div class="section-label" style="margin-bottom:8px">Composed Email</div>
+          <div class="email-box">
+            <div class="email-subject" id="res-subject">—</div>
+            <div class="email-body" id="res-body">Run the pipeline to see the composed email.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Booking result -->
+    <div id="booking-panel" style="display:none">
+      <div class="section-label">Booking Confirmation</div>
+      <div class="card">
+        <div class="card-body">
+          <div class="result-meta">
+            <div class="meta-item">
+              <div class="meta-label">Booking UID</div>
+              <div class="meta-value green" id="book-uid">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Attendee</div>
+              <div class="meta-value" id="book-email">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Start Time (UTC)</div>
+              <div class="meta-value" id="book-time">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Status</div>
+              <div class="meta-value green">✓ Confirmed</div>
+            </div>
+          </div>
+          <div class="meta-item" style="margin-top:0">
+            <div class="meta-label">Confirmation URL</div>
+            <div style="font-size:12px;color:var(--accent);margin-top:4px;font-family:monospace" id="book-url">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slots result -->
+    <div id="slots-panel" style="display:none">
+      <div class="section-label">Available Slots</div>
+      <div class="card">
+        <div class="card-body" id="slots-body"></div>
+      </div>
+    </div>
+
+    <!-- Reply → Policy → Booking flow -->
+    <div id="reply-flow-panel" style="display:none">
+      <div class="section-label">Reply Handler Flow</div>
+      <div class="card">
+        <div class="card-body">
+          <!-- Flow steps -->
+          <div style="display:flex;align-items:center;gap:0;margin-bottom:16px;flex-wrap:wrap" id="flow-steps">
+            <div class="flow-node" id="flow-reply">
+              <div class="flow-icon">💬</div>
+              <div class="flow-label">Reply Received</div>
+              <div class="flow-sub" id="flow-reply-sub">—</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node" id="flow-policy">
+              <div class="flow-icon">⚙️</div>
+              <div class="flow-label">Policy Engine</div>
+              <div class="flow-sub" id="flow-policy-sub">—</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node" id="flow-sms">
+              <div class="flow-icon">📱</div>
+              <div class="flow-label">SMS Nudge Sent</div>
+              <div class="flow-sub">Slots offered to prospect</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-node" id="flow-book">
+              <div class="flow-icon">📅</div>
+              <div class="flow-label">Call Booked</div>
+              <div class="flow-sub" id="flow-book-sub">Prospect picks a slot</div>
+            </div>
+          </div>
+          <!-- Booking result inline -->
+          <div id="flow-booking-result" style="display:none">
+            <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
+            <div class="result-meta">
+              <div class="meta-item">
+                <div class="meta-label">Booking UID</div>
+                <div class="meta-value green" id="flow-book-uid">—</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Attendee</div>
+                <div class="meta-value" id="flow-book-email">—</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Slot (UTC)</div>
+                <div class="meta-value" id="flow-book-time">—</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Status</div>
+                <div class="meta-value green">✓ Confirmed</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Briefs panel -->
+    <div id="briefs-panel" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="section-label" style="margin-bottom:0">Signal Briefs</div>
+        <div class="tabs" style="margin-bottom:0" id="brief-tabs">
+          <div class="tab active" onclick="showBriefTab('hiring')">📊 Hiring Signal</div>
+          <div class="tab" onclick="showBriefTab('gap')">🔍 Competitor Gap</div>
+        </div>
+      </div>
+
+      <!-- Hiring signal brief -->
+      <div id="brief-hiring">
+        <div class="card">
+          <div class="card-body">
+            <!-- Segment + velocity row -->
+            <div class="result-meta" id="brief-meta"></div>
+            <!-- Velocity bar -->
+            <div id="brief-velocity" style="margin-bottom:14px"></div>
+            <!-- AI signals -->
+            <div class="section-label" style="margin-bottom:8px">AI Maturity Signals</div>
+            <div class="signal-grid" id="brief-signals"></div>
+            <!-- Honesty flags -->
+            <div id="brief-flags" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Competitor gap brief -->
+      <div id="brief-gap" style="display:none">
+        <div class="card">
+          <div class="card-body">
+            <div class="result-meta" id="gap-meta"></div>
+            <div class="section-label" style="margin-bottom:8px">Gap Findings</div>
+            <div id="gap-findings"></div>
+            <!-- Self-check -->
+            <div id="gap-selfcheck" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Initial empty state -->
+    <div class="empty" id="empty-state">
+      <div class="empty-icon">🚀</div>
+      <div class="empty-text">Fill in a prospect and hit <strong>Run Pipeline</strong><br/>to trace the full enrichment → email → CRM flow.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+
+// ── Logging ──────────────────────────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const el = document.getElementById('log');
+  const ts = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.innerHTML = `<span class="log-ts">[${ts}] </span><span class="log-${type}">${msg}</span>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── Health check ─────────────────────────────────────────────────────────────
+async function checkHealth() {
+  const dot = document.getElementById('health-dot');
+  const txt = document.getElementById('health-text');
+  const kill = document.getElementById('kill-toggle');
+  try {
+    const r = await fetch(`${API}/health`);
+    const d = await r.json();
+    dot.className = 'dot online';
+    txt.textContent = 'API online';
+    const outbound = d.live_outbound_enabled === 'false' || d.live_outbound_enabled === false;
+    kill.className = outbound ? 'toggle on' : 'toggle';
+    log(`/health → status: ${d.status} · outbound: ${d.live_outbound_enabled}`, 'ok');
+  } catch {
+    dot.className = 'dot offline';
+    txt.textContent = 'API offline';
+    log('/health → connection refused. Is uvicorn running?', 'err');
+  }
+}
+
+// ── Reset steps ───────────────────────────────────────────────────────────────
+function resetSteps() {
+  ['enrichment','icp_classification','email_composition','hubspot_contact','email_send'].forEach(s => {
+    const el = document.getElementById(`step-${s}`);
+    el.className = 'step';
+    el.querySelector('.step-badge').className = 'step-badge badge-pending';
+    el.querySelector('.step-badge').textContent = 'IDLE';
+    el.querySelector('.step-detail').textContent = stepDefaults[s];
+  });
+}
+
+const stepDefaults = {
+  enrichment: 'Crunchbase · Wellfound · BuiltWith · LinkedIn',
+  icp_classification: 'Segment · Confidence threshold ≥ 65%',
+  email_composition: 'Signal-grounded · Tone check · Honesty flags',
+  hubspot_contact: 'Upsert contact · Write enrichment data',
+  email_send: 'Resend · Kill switch routes to staff sink',
+};
+
+const stepIcons = {
+  enrichment: '🔍', icp_classification: '🎯',
+  email_composition: '✍️', hubspot_contact: '🗂️', email_send: '📤',
+};
+
+function setStep(name, status, detail) {
+  const el = document.getElementById(`step-${name}`);
+  if (!el) return;
+  el.className = `step ${status}`;
+  const badge = el.querySelector('.step-badge');
+  badge.className = `step-badge badge-${status}`;
+  badge.textContent = status.toUpperCase();
+  if (detail) el.querySelector('.step-detail').textContent = detail;
+  if (status === 'running') {
+    el.querySelector('.step-icon').textContent = '⟳';
+  } else {
+    el.querySelector('.step-icon').textContent = stepIcons[name];
+  }
+}
+
+// ── Run pipeline ─────────────────────────────────────────────────────────────
+async function runPipeline() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  document.getElementById('run-icon').innerHTML = '<span class="spinner"></span>';
+  document.getElementById('run-label').textContent = 'Running…';
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('result-panel').style.display = 'none';
+  document.getElementById('booking-panel').style.display = 'none';
+  document.getElementById('slots-panel').style.display = 'none';
+  resetSteps();
+
+  const payload = {
+    company_name: document.getElementById('f-company').value,
+    contact_email: document.getElementById('f-email').value,
+    contact_first_name: document.getElementById('f-first').value,
+    contact_last_name: document.getElementById('f-last').value,
+    contact_title: document.getElementById('f-title').value,
+    domain: document.getElementById('f-domain').value,
+    dry_run: false,
+  };
+
+  log(`POST /prospects/sync → ${payload.company_name} (${payload.contact_email})`, 'info');
+
+  // Animate steps sequentially while waiting
+  const stepOrder = ['enrichment','icp_classification','email_composition','hubspot_contact','email_send'];
+  let animIdx = 0;
+  const anim = setInterval(() => {
+    if (animIdx > 0) setStep(stepOrder[animIdx-1], 'running', 'Processing…');
+    animIdx = (animIdx + 1) % stepOrder.length;
+  }, 800);
+
+  try {
+    const r = await fetch(`${API}/prospects/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    clearInterval(anim);
+    const d = await r.json();
+
+    // Update steps from response
+    (d.steps || []).forEach(s => {
+      const ok = s.status === 'ok';
+      let detail = '';
+      if (s.step === 'icp_classification') detail = `segment: ${s.segment || '—'} · confidence: ${s.confidence ?? '—'}`;
+      else if (s.step === 'email_composition') detail = `tone_check: ${s.tone_check_passed} · subject ready`;
+      else if (s.step === 'hubspot_contact' && ok) detail = `contact_id: ${s.contact_id} · action: ${s.action}`;
+      else if (s.step === 'hubspot_contact' && !ok) detail = 'CRM write failed — see log';
+      else if (s.step === 'email_send') detail = s.sandbox_routed ? 'routed to staff sink (kill switch on)' : (ok ? 'sent' : 'not sent');
+      else if (s.step === 'enrichment') detail = `ai_maturity: ${s.ai_maturity}`;
+      setStep(s.step, ok ? 'ok' : 'error', detail);
+    });
+
+    // Show result panel
+    const start = new Date(d.pipeline_start);
+    const end = new Date(d.pipeline_end);
+    const dur = ((end - start) / 1000).toFixed(1) + 's';
+
+    document.getElementById('res-trace').textContent = (d.trace_id || '—').slice(0, 18) + '…';
+    document.getElementById('res-duration').textContent = dur + ' end-to-end';
+
+    const seg = d.icp_segment || '—';
+    const segEl = document.getElementById('res-segment');
+    segEl.textContent = seg === 'abstain' ? 'abstain' : seg.replace('segment_','').replace(/_/g,' ');
+    segEl.className = 'meta-value ' + (seg === 'abstain' ? 'muted' : 'green');
+
+    // Find confidence from steps
+    const icpStep = (d.steps||[]).find(s => s.step === 'icp_classification');
+    const conf = icpStep?.confidence ?? 0;
+    const confEl = document.getElementById('res-confidence');
+    confEl.textContent = conf > 0 ? (conf * 100).toFixed(0) + '%' : 'n/a';
+    confEl.className = 'meta-value ' + (conf >= 0.65 ? 'green' : conf > 0 ? 'yellow' : 'muted');
+
+    const mat = d.ai_maturity_score ?? 0;
+    const matEl = document.getElementById('res-maturity');
+    matEl.textContent = `${mat} / 3`;
+    matEl.className = 'meta-value ' + (mat >= 2 ? 'green' : mat === 1 ? 'yellow' : 'muted');
+
+    const hsEl = document.getElementById('res-hubspot');
+    hsEl.textContent = d.hubspot_contact_id ? `#${d.hubspot_contact_id}` : 'not written';
+    hsEl.className = 'meta-value ' + (d.hubspot_contact_id ? 'green' : 'muted');
+
+    document.getElementById('res-subject').textContent = d.email_subject || '—';
+    document.getElementById('res-body').textContent = d.email_sent
+      ? 'Sent (routed to staff sink — kill switch active)'
+      : 'Not sent — kill switch active. Email composed and ready.';
+
+    document.getElementById('result-panel').style.display = 'block';
+    log(`Pipeline complete in ${dur} — segment: ${seg} · maturity: ${mat}/3`, seg === 'abstain' ? 'info' : 'ok');
+
+    // Load briefs for the domain
+    const domain = document.getElementById('f-domain').value;
+    if (domain) loadBriefs(domain);
+
+  } catch (e) {
+    clearInterval(anim);
+    stepOrder.forEach(s => setStep(s, 'error', 'Request failed'));
+    log(`Pipeline error: ${e.message}`, 'err');
+  }
+
+  btn.disabled = false;
+  document.getElementById('run-icon').textContent = '▶';
+  document.getElementById('run-label').textContent = 'Run Pipeline';
+}
+
+// ── Simulate reply ────────────────────────────────────────────────────────────
+function setFlowNode(id, state, sub) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'flow-node ' + state;
+  if (sub) document.getElementById(id + '-sub') && (document.getElementById(id + '-sub').textContent = sub);
+}
+
+async function simulateReply() {
+  const email = document.getElementById('f-email').value || 'jane@acmedataco.com';
+  const name  = `${document.getElementById('f-first').value} ${document.getElementById('f-last').value}`.trim() || 'Jane Smith';
+
+  // Show flow panel and reset
+  document.getElementById('reply-flow-panel').style.display = 'block';
+  document.getElementById('flow-booking-result').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'none';
+  ['flow-reply','flow-policy','flow-sms','flow-book'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'flow-node';
+  });
+
+  // Step 1 — reply received
+  setFlowNode('flow-reply', 'active', email);
+  log(`POST /webhooks/email → simulating positive reply from ${email}`, 'info');
+
+  try {
+    const r = await fetch(`${API}/webhooks/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'email.replied',
+        data: {
+          to: [email], from: email,
+          text: "Hi, this is actually really timely - we just closed our Series A and we are trying to scale the team fast. Happy to have a quick call. What does your availability look like?",
+        },
+      }),
+    });
+    const d = await r.json();
+    setFlowNode('flow-reply', 'done', `accepted · ${d.event_type}`);
+    log(`Reply webhook → ${d.status}`, 'ok');
+
+    // Step 2 — policy engine (simulate 1s processing)
+    await new Promise(res => setTimeout(res, 900));
+    setFlowNode('flow-policy', 'active', 'Classifying intent...');
+    await new Promise(res => setTimeout(res, 1000));
+    setFlowNode('flow-policy', 'done', 'SCHEDULING · conf: 0.90 · autonomous: true');
+    log('Policy engine → SCHEDULING intent · action: book_call · autonomous: true', 'ok');
+
+    // Step 3 — SMS nudge
+    await new Promise(res => setTimeout(res, 700));
+    setFlowNode('flow-sms', 'active', 'Sending slots...');
+    await new Promise(res => setTimeout(res, 600));
+    setFlowNode('flow-sms', 'done', 'Kill switch → staff sink');
+    log('SMS nudge → routed to staff sink (kill switch on)', 'info');
+
+    // Step 4 — auto-book
+    await new Promise(res => setTimeout(res, 800));
+    setFlowNode('flow-book', 'active', 'Prospect selecting slot...');
+    log('POST /book → auto-booking call', 'info');
+
+    const br = await fetch(`${API}/book`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contact_email: email, contact_name: name,
+        start_time: '2026-04-29T11:00:00Z',
+        timezone: 'Africa/Nairobi',
+        icp_segment: 'segment_1_series_a_b',
+      }),
+    });
+    const bd = await br.json();
+    setFlowNode('flow-book', 'done', bd.booking_uid || 'confirmed');
+    document.getElementById('flow-book-uid').textContent   = bd.booking_uid || '—';
+    document.getElementById('flow-book-email').textContent = bd.attendee_email || email;
+    document.getElementById('flow-book-time').textContent  = bd.start_time || '—';
+    document.getElementById('flow-booking-result').style.display = 'block';
+    log(`Booking confirmed → uid: ${bd.booking_uid} · mock: ${bd.mock}`, 'ok');
+
+  } catch (e) {
+    log(`Reply flow error: ${e.message}`, 'err');
+  }
+}
+
+
+// ── Get slots ─────────────────────────────────────────────────────────────────
+async function getSlots() {
+  log('GET /slots → timezone: Africa/Nairobi', 'info');
+  document.getElementById('slots-panel').style.display = 'none';
+  document.getElementById('booking-panel').style.display = 'none';
+  try {
+    const r = await fetch(`${API}/slots?timezone=Africa/Nairobi`);
+    const d = await r.json();
+    const slots = d.slots || [];
+    const body = document.getElementById('slots-body');
+    if (!slots.length) {
+      body.innerHTML = '<div style="color:var(--muted);font-size:12px">No slots returned.</div>';
+    } else {
+      body.innerHTML = slots.slice(0, 8).map(s =>
+        `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;display:flex;justify-content:space-between">
+          <span>${s.start || s}</span>
+          <span style="color:var(--green)">Available</span>
+        </div>`
+      ).join('');
+    }
+    document.getElementById('slots-panel').style.display = 'block';
+    document.getElementById('empty-state').style.display = 'none';
+    log(`Slots → ${slots.length} available · timezone: ${d.timezone}`, 'ok');
+  } catch (e) {
+    log(`Slots error: ${e.message}`, 'err');
+  }
+}
+
+// ── Briefs ────────────────────────────────────────────────────────────────────
+function showBriefTab(which) {
+  document.getElementById('brief-hiring').style.display = which === 'hiring' ? 'block' : 'none';
+  document.getElementById('brief-gap').style.display    = which === 'gap'     ? 'block' : 'none';
+  document.querySelectorAll('#brief-tabs .tab').forEach((t, i) => {
+    t.className = 'tab' + ((which === 'hiring' && i === 0) || (which === 'gap' && i === 1) ? ' active' : '');
+  });
+}
+
+async function loadBriefs(domain) {
+  try {
+    const r = await fetch(`${API}/briefs/${domain}`);
+    if (!r.ok) { log(`No briefs for ${domain}`, 'info'); return; }
+    const d = await r.json();
+    if (d.hiring_signal_brief) renderHiringBrief(d.hiring_signal_brief);
+    if (d.competitor_gap_brief) renderGapBrief(d.competitor_gap_brief);
+    document.getElementById('briefs-panel').style.display = 'block';
+    document.getElementById('empty-state').style.display = 'none';
+    log(`Briefs loaded for ${domain}`, 'ok');
+  } catch(e) {
+    log(`Briefs fetch error: ${e.message}`, 'err');
+  }
+}
+
+function renderHiringBrief(b) {
+  const seg = b.primary_segment_match || '—';
+  const conf = b.segment_confidence || 0;
+  const mat = b.ai_maturity?.score ?? 0;
+  const vel = b.hiring_velocity || {};
+  const funding = b.buying_window_signals?.funding_event || {};
+
+  document.getElementById('brief-meta').innerHTML = `
+    <div class="meta-item">
+      <div class="meta-label">ICP Segment</div>
+      <div class="meta-value ${seg === 'abstain' ? 'muted' : 'green'}">${seg.replace('segment_','').replace(/_/g,' ')}</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Segment Confidence</div>
+      <div class="meta-value ${conf >= 0.65 ? 'green' : conf > 0 ? 'yellow' : 'muted'}">${conf > 0 ? (conf*100).toFixed(0)+'%' : 'n/a'}</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">AI Maturity</div>
+      <div class="meta-value ${mat >= 2 ? 'green' : mat === 1 ? 'yellow' : 'muted'}">${mat} / 3</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Funding</div>
+      <div class="meta-value ${funding.detected ? 'green' : 'muted'}">${funding.detected ? funding.stage + ' $' + (funding.amount_usd/1e6).toFixed(0) + 'M' : 'None detected'}</div>
+    </div>`;
+
+  const today = vel.open_roles_today || 0;
+  const ago   = vel.open_roles_60_days_ago || 0;
+  const pct   = ago > 0 ? Math.min((today / ago) * 50, 100) : 50;
+  document.getElementById('brief-velocity').innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
+      <span>Hiring Velocity</span>
+      <span style="color:${vel.velocity_label==='doubled'?'var(--green)':'var(--text)'}">
+        ${ago} roles → ${today} roles (${vel.velocity_label || '—'})
+      </span>
+    </div>
+    <div class="vel-bar-wrap"><div class="vel-bar" style="width:${pct}%"></div></div>`;
+
+  const signals = b.ai_maturity?.justifications || [];
+  const weightClass = w => w === 'high' ? 'w-high' : w === 'medium' ? 'w-medium' : 'w-low';
+  const confClass   = c => c === 'high' ? 'c-high' : c === 'medium' ? 'c-medium' : 'c-low';
+  const found = s => s.status && !s.status.toLowerCase().startsWith('no ') && !s.status.toLowerCase().startsWith('not ');
+  document.getElementById('brief-signals').innerHTML = signals.map(s => `
+    <div class="signal-row ${found(s) ? 'found' : 'missing'}">
+      <div class="sig-icon">${found(s) ? '✅' : '⚠️'}</div>
+      <div style="flex:1">
+        <div class="sig-name">${s.signal.replace(/_/g,' ')}</div>
+        <div class="sig-status">${s.status}</div>
+        <div class="sig-badges">
+          <span class="sig-badge ${weightClass(s.weight)}">weight: ${s.weight}</span>
+          <span class="sig-badge ${confClass(s.confidence)}">conf: ${s.confidence}</span>
+          ${s.source_url ? `<a href="${s.source_url}" target="_blank" style="font-size:10px;color:var(--accent)">source ↗</a>` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+
+  const flags = b.honesty_flags || [];
+  document.getElementById('brief-flags').innerHTML = flags.length ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--muted);font-weight:700">⚠ Honesty flags:</span>
+      ${flags.map(f => `<span style="font-size:10px;background:#f59e0b22;color:var(--yellow);padding:2px 8px;border-radius:4px">${f}</span>`).join('')}
+    </div>` : '';
+}
+
+function renderGapBrief(b) {
+  const matScore = b.prospect_ai_maturity_score ?? 0;
+  const benchmark = b.sector_top_quartile_benchmark ?? 0;
+  const sc = b.gap_quality_self_check || {};
+  document.getElementById('gap-meta').innerHTML = `
+    <div class="meta-item">
+      <div class="meta-label">Prospect AI Score</div>
+      <div class="meta-value yellow">${matScore} / 3</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Sector Top Quartile</div>
+      <div class="meta-value green">${benchmark} / 3</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Competitors Analysed</div>
+      <div class="meta-value">${(b.competitors_analyzed||[]).length}</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Quality Gate</div>
+      <div class="meta-value ${sc.at_least_one_gap_high_confidence ? 'green' : 'red'}">${sc.at_least_one_gap_high_confidence ? '✓ Pass' : '✗ Fail'}</div>
+    </div>`;
+
+  const findings = b.gap_findings || [];
+  document.getElementById('gap-findings').innerHTML = findings.map(g => `
+    <div class="gap-item ${g.confidence === 'high' ? 'high' : ''}">
+      <div class="gap-practice">
+        <span>${g.practice}</span>
+        <span class="step-badge ${g.confidence === 'high' ? 'badge-error' : 'badge-pending'}" style="font-size:10px">${g.confidence?.toUpperCase()}</span>
+      </div>
+      <div class="gap-prospect">${g.prospect_state}</div>
+      <div class="peer-evidence">
+        ${(g.peer_evidence||[]).map(p => `
+          <div class="peer-row">
+            <span class="peer-name">${p.competitor_name}</span>
+            <span class="peer-ev">${p.evidence}
+              ${p.source_url ? `<a href="${p.source_url}" target="_blank" style="color:var(--accent);margin-left:4px">↗</a>` : ''}
+            </span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+
+  const checks = [
+    ['All peer evidence has source URL', sc.all_peer_evidence_has_source_url],
+    ['At least one gap high confidence', sc.at_least_one_gap_high_confidence],
+    ['Silent-but-sophisticated risk', sc.prospect_silent_but_sophisticated_risk],
+  ];
+  document.getElementById('gap-selfcheck').innerHTML = `
+    <div class="section-label" style="margin-bottom:8px">Quality Self-Check</div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${checks.map(([label, val]) => `
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
+          <span>${label}</span>
+          <span style="color:${val ? 'var(--green)' : 'var(--muted)'}">${val ? '✓ true' : '✗ false'}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+checkHealth();
+setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>
